@@ -149,7 +149,7 @@
                 <configuration>
                   <minimizeJar>${packaging.minimizeJar}</minimizeJar>
                   <shadedArtifactAttached>true</shadedArtifactAttached>
-                  <shadedClassifierName>${hive.jdbc.driver.classifier}</shadedClassifierName>
+<!--                  <shadedClassifierName>${hive.jdbc.driver.classifier}</shadedClassifierName>-->
                   <filters>
                     <filter>
                       <artifact>org.apache.hive.shims:hive-shims-common</artifact>

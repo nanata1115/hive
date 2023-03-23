@@ -70,7 +70,7 @@
     <maven.compiler.useIncrementalCompilation>false</maven.compiler.useIncrementalCompilation>
     <maven.repo.local>${settings.localRepository}</maven.repo.local>
     <hive.path.to.root>.</hive.path.to.root>
-    <hive.jdbc.driver.classifier>standalone</hive.jdbc.driver.classifier>
+<!--    <hive.jdbc.driver.classifier>standalone</hive.jdbc.driver.classifier>-->
     <checkstyle.conf.dir>${basedir}/${hive.path.to.root}/checkstyle</checkstyle.conf.dir>
     <!-- SonarCloud-related variables -->
     <sonar.moduleKey>${project.groupId}:${project.artifactId}</sonar.moduleKey>

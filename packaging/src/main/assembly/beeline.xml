@@ -55,7 +55,7 @@
                 <include>net.sf.supercsv:super-csv:jar</include>
             </includes>
             <excludes>
-                <exclude>org.apache.hive:hive-jdbc:*:standalone</exclude>
+                <exclude>org.apache.hive:hive-jdbc:*</exclude>
             </excludes>
         </dependencySet>
     </dependencySets>

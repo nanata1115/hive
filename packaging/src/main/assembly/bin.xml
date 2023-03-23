@@ -47,7 +47,7 @@
         <exclude>ch.qos.reload4j:*</exclude>
         <exclude>junit:*</exclude>
         <exclude>commons-configuration:commons-configuration</exclude>
-        <exclude>org.apache.hive:hive-jdbc:*:standalone</exclude>
+        <exclude>org.apache.hive:hive-jdbc:*</exclude>
         <exclude>org.apache.hive:hive-contrib</exclude>
         <exclude>com.oracle.database.jdbc:*</exclude>
         <exclude>mysql:mysql-connector-java:*</exclude>
@@ -60,7 +60,7 @@
       <useProjectArtifact>false</useProjectArtifact>
       <useStrictFiltering>true</useStrictFiltering>
       <includes>
-        <include>org.apache.hive:hive-jdbc:*:standalone</include>
+        <include>org.apache.hive:hive-jdbc:*</include>
       </includes>
     </dependencySet>
     <dependencySet>
@@ -105,7 +105,7 @@
       <useTransitiveFiltering>true</useTransitiveFiltering>
       <excludes>
         <exclude>org.apache.hadoop:*</exclude>
-        <exclude>org.apache.hive:hive-jdbc:jar:standalone</exclude>
+        <exclude>org.apache.hive:hive-jdbc:jar</exclude>
         <exclude>org.apache.httpcomponents:*</exclude>
       </excludes>
       <includes>
