@@ -66,7 +66,7 @@
     <hive.version.shortname>4.0.0</hive.version.shortname>
     <!-- Build Properties -->
     <maven.compiler.source>1.8</maven.compiler.source>
-    <maven.compiler.target>1.8</maven.compiler.target>
+    <maven.compiler.target>17</maven.compiler.target>
     <maven.compiler.useIncrementalCompilation>false</maven.compiler.useIncrementalCompilation>
     <maven.repo.local>${settings.localRepository}</maven.repo.local>
     <hive.path.to.root>.</hive.path.to.root>
@@ -110,10 +110,10 @@
     <avro.version>1.11.1</avro.version>
     <bcprov-jdk15on.version>1.64</bcprov-jdk15on.version>
     <calcite.version>1.25.0</calcite.version>
-    <datanucleus-api-jdo.version>5.2.8</datanucleus-api-jdo.version>
-    <datanucleus-core.version>5.2.10</datanucleus-core.version>
+    <datanucleus-api-jdo.version>6.0.1</datanucleus-api-jdo.version>
+    <datanucleus-core.version>6.0.3</datanucleus-core.version>
     <datanucleus-jdo.version>3.2.0-release</datanucleus-jdo.version>
-    <datanucleus-rdbms.version>5.2.10</datanucleus-rdbms.version>
+    <datanucleus-rdbms.version>6.0.3</datanucleus-rdbms.version>
     <commons-cli.version>1.4</commons-cli.version>
     <commons-codec.version>1.15</commons-codec.version>
     <commons-collections.version>3.2.2</commons-collections.version>
@@ -172,7 +172,7 @@
     <!-- Leaving libfb303 at 0.9.3 regardless of libthrift: As per THRIFT-4613 The Apache Thrift project does not publish items related to fb303 at this point -->
     <libfb303.version>0.9.3</libfb303.version>
     <libthrift.version>0.16.0</libthrift.version>
-    <log4j2.version>2.18.0</log4j2.version>
+    <log4j2.version>2.19.0</log4j2.version>
     <mariadb.version>2.5.0</mariadb.version>
     <mssql.version>6.2.1.jre8</mssql.version>
     <mysql.version>8.0.27</mysql.version>

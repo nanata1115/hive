@@ -239,7 +239,7 @@
             <goals>
               <goal>javadoc</goal>
             </goals>
-            <phase>compile</phase>
+            <phase>none</phase>
             <configuration>
               <encoding>${project.build.sourceEncoding}</encoding>
               <verbose>true</verbose>

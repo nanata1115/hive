@@ -95,6 +95,53 @@
               </execution>
             </executions>
           </plugin>
+          <plugin>
+            <groupId>org.codehaus.mojo</groupId>
+            <artifactId>rpm-maven-plugin</artifactId>
+            <version>2.1.5</version>
+            <extensions>true</extensions>
+            <configuration>
+
+              <distribution>maven package rpm hive</distribution>
+
+              <!-- 集团信息 -->
+              <group>${groupId}</group>
+
+              <!-- 打包作者信息(作者|公司名) -->
+              <packager>nanata</packager>
+              <targetOS>el7</targetOS>
+              <targetVendor>rh</targetVendor>
+              <!-- npd版本信息  -->
+              <version>3.0</version>
+              <!-- 小版本(可选参数,不填默认为1) -->
+              <!--          <release></release>-->
+              <needarch>x86_64</needarch>
+              <!-- 是否自动解决依赖 -->
+              <autoRequires>false</autoRequires>
+              <mappings>
+                <mapping>
+                  <!-- 安装rpm时指向的服务器安装目录  -->
+                  <directory>/usr/ndp/3.0/hive</directory>
+                  <filemode>777</filemode>
+                  <username>hive</username>
+                  <groupname>hive</groupname>
+                  <sources>
+                    <source>
+                      <location>target/apache-hive-4.0.0-SNAPSHOT-bin/apache-hive-4.0.0-SNAPSHOT-bin</location>
+                    </source>
+                  </sources>
+                </mapping>
+              </mappings>
+            </configuration>
+            <executions>
+              <execution>
+                <goals>
+                  <goal>rpm</goal>
+                </goals>
+                <phase>package</phase>
+              </execution>
+            </executions>
+          </plugin>
         </plugins>
       </build>
     </profile>
