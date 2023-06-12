@@ -78,6 +78,7 @@
         <include>org.apache.hive.hcatalog:hive-hcatalog-core</include>
         <include>org.apache.hive.hcatalog:hive-hcatalog-server-extensions</include>
         <include>javax.ws.rs:javax.ws.rs-api</include>
+        <include>org.apache.hive:hive-jdbc:*</include>
       </includes>
     </dependencySet>
     <dependencySet>

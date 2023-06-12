@@ -95,10 +95,6 @@
           <artifactId>tesla-aether</artifactId>
         </exclusion>
         <exclusion>
-          <groupId>org.hyperic</groupId>
-          <artifactId>sigar</artifactId>
-        </exclusion>
-        <exclusion>
           <groupId>com.fasterxml.jackson.core</groupId>
           <artifactId>jackson-core</artifactId>
         </exclusion>
@@ -129,10 +125,6 @@
         <exclusion>
           <groupId>com.ibm.icu</groupId>
           <artifactId>icu4j</artifactId>
-        </exclusion>
-        <exclusion>
-          <groupId>org.hyperic</groupId>
-          <artifactId>sigar</artifactId>
         </exclusion>
         <exclusion>
           <groupId>org.codehaus.plexus</groupId>
@@ -321,7 +313,7 @@
       <activation>
         <property>
           <name>skipShade</name>
-          <value>!true</value>
+          <value>true</value>
         </property>
       </activation>
       <build>

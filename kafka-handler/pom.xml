@@ -140,7 +140,7 @@
       <activation>
         <property>
           <name>skipShade</name>
-          <value>!true</value>
+          <value>true</value>
         </property>
       </activation>
       <build>
