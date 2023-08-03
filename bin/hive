@@ -23,7 +23,7 @@ esac
 bin=`dirname "$0"`
 bin=`cd "$bin"; pwd`
 
-. "$bin"/hive-config.sh
+. /usr/ndp/3.0/hive/bin/hive-config.sh
 
 SERVICE=""
 HELP=""
