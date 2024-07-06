@@ -24,6 +24,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.stream.Collectors;
+import org.apache.commons.lang3.ObjectUtils;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hive.ql.io.PositionDeleteInfo;
 import org.apache.hadoop.hive.ql.metadata.VirtualColumn;
@@ -47,6 +48,7 @@ public class IcebergAcidUtil {
   private static final Types.NestedField PARTITION_STRUCT_META_COL = null; // placeholder value in the map
   private static final Map<Types.NestedField, Integer> FILE_READ_META_COLS = Maps.newLinkedHashMap();
   private static final Map<String, Types.NestedField> VIRTUAL_COLS_TO_META_COLS = Maps.newLinkedHashMap();
+  public static final String META_TABLE_PROPERTY = "metaTable";
 
   static {
     FILE_READ_META_COLS.put(MetadataColumns.SPEC_ID, 0);
@@ -110,14 +112,14 @@ public class IcebergAcidUtil {
   public static PositionDelete<Record> getPositionDelete(Record rec, Record rowData) {
     PositionDelete<Record> positionDelete = PositionDelete.create();
     String filePath = rec.get(SERDE_META_COLS.get(MetadataColumns.FILE_PATH), String.class);
-    long filePosition = rec.get(SERDE_META_COLS.get(MetadataColumns.ROW_POSITION), Long.class);
+    Long filePosition = rec.get(SERDE_META_COLS.get(MetadataColumns.ROW_POSITION), Long.class);
 
     int dataOffset = SERDE_META_COLS.size(); // position in the rec where the actual row data begins
     for (int i = dataOffset; i < rec.size(); ++i) {
       rowData.set(i - dataOffset, rec.get(i));
     }
 
-    positionDelete.set(filePath, filePosition, rowData);
+    positionDelete.set(filePath, ObjectUtils.defaultIfNull(filePosition, 0L), rowData);
     return positionDelete;
   }
 

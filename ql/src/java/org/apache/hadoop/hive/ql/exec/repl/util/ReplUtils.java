@@ -45,6 +45,8 @@ import org.apache.hadoop.hive.metastore.messaging.MessageFactory;
 import org.apache.hadoop.hive.metastore.utils.StringUtils;
 import org.apache.hadoop.hive.ql.ErrorMsg;
 import org.apache.hadoop.hive.ql.ddl.DDLWork;
+import org.apache.hadoop.hive.ql.ddl.DDLOperation;
+import org.apache.hadoop.hive.ql.ddl.table.create.CreateTableOperation;
 import org.apache.hadoop.hive.ql.ddl.table.misc.properties.AlterTableSetPropertiesDesc;
 import org.apache.hadoop.hive.ql.ddl.table.partition.PartitionUtils;
 import org.apache.hadoop.hive.ql.exec.Task;
@@ -68,7 +70,6 @@ import org.apache.hadoop.hive.ql.parse.repl.dump.metric.BootstrapDumpMetricColle
 import org.apache.hadoop.hive.ql.parse.repl.dump.metric.IncrementalDumpMetricCollector;
 import org.apache.hadoop.hive.ql.parse.repl.load.metric.BootstrapLoadMetricCollector;
 import org.apache.hadoop.hive.ql.parse.repl.load.metric.IncrementalLoadMetricCollector;
-import org.apache.hadoop.hive.ql.parse.repl.load.metric.PreOptimizedBootstrapLoadMetricCollector;
 import org.apache.hadoop.hive.ql.parse.repl.metric.ReplicationMetricCollector;
 import org.apache.hadoop.hive.ql.parse.repl.metric.event.Metadata;
 import org.apache.hadoop.hive.ql.parse.repl.metric.event.Status;
@@ -351,6 +352,14 @@ public class ReplUtils {
     return errorCode;
   }
 
+  public static boolean shouldIgnoreOnError(DDLOperation<?> ddlOperation, Throwable e) {
+    return ReplUtils.isCreateOperation(ddlOperation) && e.getMessage().contains("java.lang.NumberFormatException");
+  }
+
+  public static boolean isCreateOperation(DDLOperation<?> ddlOperation) {
+    return ddlOperation instanceof CreateTableOperation;
+  }
+
   private static String getMetricStageName(String stageName, ReplicationMetricCollector metricCollector) {
     if( stageName == "REPL_DUMP" || stageName == "REPL_LOAD" || stageName == "ATLAS_DUMP" || stageName == "ATLAS_LOAD"
             || stageName == "RANGER_DUMP" || stageName == "RANGER_LOAD" || stageName == "RANGER_DENY"){
@@ -470,7 +479,7 @@ public class ReplUtils {
   }
 
   public static Path getEncodedDumpRootPath(HiveConf conf, String dbname) throws UnsupportedEncodingException {
-    return new Path(conf.getVar(HiveConf.ConfVars.REPLDIR),
+    return new Path(conf.getVar(HiveConf.ConfVars.REPL_DIR),
       Base64.getEncoder().encodeToString(dbname
         .getBytes(StandardCharsets.UTF_8.name())));
   }

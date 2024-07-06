@@ -42,6 +42,7 @@ import org.apache.hadoop.hive.metastore.utils.SecurityUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.IOException;
 import java.net.InetAddress;
 import java.util.ArrayList;
 import java.util.List;
@@ -79,7 +80,7 @@ public class LeaseLeaderElection implements LeaderElection<TableName> {
 
   // For non-leader instances to check the lock periodically to
   // see if there is a chance to take over the leadership.
-  // At any time, only one of heartbeater and nonLeaderWatcher is alive.
+  // At any time, either heartbeater or nonLeaderWatcher is alive.
   private LeaseWatcher nonLeaderWatcher;
 
   // Current lock id
@@ -92,9 +93,17 @@ public class LeaseLeaderElection implements LeaderElection<TableName> {
   public static final String METASTORE_RENEW_LEASE = "metastore.renew.leader.lease";
 
   private String name;
+  private String userName;
+  private String hostName;
 
-  private void doWork(LockResponse resp, Configuration conf,
+  public LeaseLeaderElection() throws IOException {
+    userName = SecurityUtils.getUser();
+    hostName = InetAddress.getLocalHost().getHostName();
+  }
+
+  private synchronized void doWork(LockResponse resp, Configuration conf,
       TableName tableName) throws LeaderException {
+    long start = System.currentTimeMillis();
     lockId = resp.getLockid();
     assert resp.getState() == LockState.ACQUIRED || resp.getState() == LockState.WAITING;
     shutdownWatcher();
@@ -121,6 +130,7 @@ public class LeaseLeaderElection implements LeaderElection<TableName> {
     default:
       throw new IllegalStateException("Unexpected lock state: " + resp.getState());
     }
+    LOG.debug("Spent {}ms to notify the listeners, isLeader: {}", System.currentTimeMillis() - start, isLeader);
   }
 
   private void notifyListener() {
@@ -134,7 +144,6 @@ public class LeaseLeaderElection implements LeaderElection<TableName> {
       } catch (Exception e) {
         LOG.error("Error notifying the listener: " + listener +
             ", leader: " + isLeader, e);
-        // throw new LeaderException(e);
       }
     });
   }
@@ -143,13 +152,6 @@ public class LeaseLeaderElection implements LeaderElection<TableName> {
   public void tryBeLeader(Configuration conf, TableName table) throws LeaderException {
     requireNonNull(conf, "conf is null");
     requireNonNull(table, "table is null");
-    String user, hostName;
-    try {
-      user = SecurityUtils.getUser();
-      hostName = InetAddress.getLocalHost().getHostName();
-    } catch (Exception e) {
-      throw new LeaderException("Error while getting the username", e);
-    }
 
     if (store == null) {
       store = TxnUtils.getTxnStore(conf);
@@ -166,7 +168,7 @@ public class LeaseLeaderElection implements LeaderElection<TableName> {
     boolean lockable = false;
     Exception recentException = null;
     long start = System.currentTimeMillis();
-    LockRequest req = new LockRequest(components, user, hostName);
+    LockRequest req = new LockRequest(components, userName, hostName);
     int numRetries = MetastoreConf.getIntVar(conf, MetastoreConf.ConfVars.LOCK_NUMRETRIES);
     long maxSleep = MetastoreConf.getTimeVar(conf,
         MetastoreConf.ConfVars.LOCK_SLEEP_BETWEEN_RETRIES, TimeUnit.MILLISECONDS);
@@ -176,6 +178,7 @@ public class LeaseLeaderElection implements LeaderElection<TableName> {
         if (res.getState() == LockState.WAITING || res.getState() == LockState.ACQUIRED) {
           lockable = true;
           doWork(res, conf, table);
+          LOG.debug("Spent {}ms to lock the table {}, retries: {}", System.currentTimeMillis() - start, table, i);
           break;
         }
       } catch (NoSuchTxnException | TxnAbortedException e) {
@@ -247,7 +250,7 @@ public class LeaseLeaderElection implements LeaderElection<TableName> {
     }
 
     public void perform() {
-      LOG.info("Starting " + getClass().getName() + " for leader: " + name);
+      LOG.info("Starting a watcher: {} for {}", getClass().getName(), name);
       start();
     }
 
@@ -290,11 +293,9 @@ public class LeaseLeaderElection implements LeaderElection<TableName> {
   }
 
   private class NonLeaderWatcher extends LeaseWatcher {
-    private CheckLockRequest request;
-
     private long sleep;
-
     private int count;
+    private CheckLockRequest request;
 
     NonLeaderWatcher(Configuration conf, TableName table) {
       super(conf, table);
@@ -316,17 +317,18 @@ public class LeaseLeaderElection implements LeaderElection<TableName> {
             reclaim();
           }
         } else {
-          // If the leader crashes, the lock it holds will become timeout eventually.
+          // In case the leader crashes, the lock it holds will become timeout eventually.
           // The AcidHouseKeeperService would not clean the corrupt lock until a new leader is elected,
-          // however the leader candidate should hold that lock firstly in order to be the new leader,
-          // so a deadlock occurs in such case.
-          // For non-leader instances, they should try to clean timeout locks if possible to avoid
-          // such problem.
+          // however a leader candidate should hold that lock firstly in order to be the new leader,
+          // a deadlock occurs in such case.
+          // For all non-leader instances, they should try to clean timeout locks if possible to
+          // avoid such problem.
           store.performTimeOuts();
         }
       } catch (NoSuchTxnException | TxnAbortedException e) {
         throw new AssertionError("This should not happen, we didn't open txn", e);
       } catch (NoSuchLockException e) {
+        LOG.info("No such lock {} for NonLeaderWatcher, try to obtain the lock again...", lockId);
         reclaim();
       } catch (Exception e) {
         // Wait for next cycle.
@@ -382,6 +384,7 @@ public class LeaseLeaderElection implements LeaderElection<TableName> {
       } catch (NoSuchTxnException | TxnAbortedException e) {
         throw new AssertionError("This should not happen, we didn't open txn", e);
       } catch (NoSuchLockException e) {
+        LOG.info("No such lock {} for Heartbeater, try to obtain the lock again...", lockId);
         reclaim();
       } catch (Exception e) {
         // Wait for next cycle.
@@ -407,6 +410,7 @@ public class LeaseLeaderElection implements LeaderElection<TableName> {
       super(conf, tableName);
       timeout = MetastoreConf.getTimeVar(conf,
           MetastoreConf.ConfVars.TXN_TIMEOUT, TimeUnit.MILLISECONDS) + 3000;
+      setName("ReleaseAndRequireWatcher");
     }
 
     @Override
@@ -449,7 +453,7 @@ public class LeaseLeaderElection implements LeaderElection<TableName> {
       } catch (NoSuchLockException | TxnOpenException e) {
         // ignore
       } catch (Exception e) {
-        LOG.error("Error while unlocking", e);
+        LOG.error("Error while unlocking: " + lockId, e);
       }
     }
   }
@@ -467,5 +471,4 @@ public class LeaseLeaderElection implements LeaderElection<TableName> {
   public String getName() {
     return name;
   }
-
 }

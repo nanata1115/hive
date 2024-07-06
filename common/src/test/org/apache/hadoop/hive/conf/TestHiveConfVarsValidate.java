@@ -25,6 +25,8 @@ import java.util.Collection;
 import java.util.List;
 
 import static org.apache.hadoop.hive.conf.HiveConf.ConfVars;
+import static org.apache.hadoop.hive.conf.HiveConf.ConfVars.HIVE_DATETIME_FORMATTER;
+import static org.apache.hadoop.hive.conf.HiveConf.ConfVars.HIVE_DATETIME_RESOLVER_STYLE;
 import static org.apache.hadoop.hive.conf.HiveConf.ConfVars.HIVE_EXPLAIN_NODE_VISIT_LIMIT;
 import static org.junit.Assert.assertEquals;
 
@@ -56,6 +58,19 @@ public class TestHiveConfVarsValidate {
     list.add(new Object[] { HIVE_EXPLAIN_NODE_VISIT_LIMIT, "1", null });
     list.add(new Object[] { HIVE_EXPLAIN_NODE_VISIT_LIMIT, "14", null });
     list.add(new Object[] { HIVE_EXPLAIN_NODE_VISIT_LIMIT, String.valueOf(Integer.MAX_VALUE), null });
+    list.add(new Object[] { HIVE_DATETIME_FORMATTER, "DATETIME", null });
+    list.add(new Object[] { HIVE_DATETIME_FORMATTER, "SIMPLE", null });
+    list.add(new Object[] { HIVE_DATETIME_FORMATTER, "simple", null });
+    list.add(new Object[] { HIVE_DATETIME_FORMATTER, "dateTime", null });
+    list.add(new Object[] { HIVE_DATETIME_FORMATTER, "OTHER", "Invalid value.. expects one of [datetime, simple]" });
+    list.add(new Object[] { HIVE_DATETIME_RESOLVER_STYLE, "SMART", null});
+    list.add(new Object[] { HIVE_DATETIME_RESOLVER_STYLE, "STRICT", null});
+    list.add(new Object[] { HIVE_DATETIME_RESOLVER_STYLE, "LENIENT", null});
+    list.add(new Object[] { HIVE_DATETIME_RESOLVER_STYLE, "smart", null});
+    list.add(new Object[] { HIVE_DATETIME_RESOLVER_STYLE, "strict", null});
+    list.add(new Object[] { HIVE_DATETIME_RESOLVER_STYLE, "lenient", null});
+    list.add(new Object[] { HIVE_DATETIME_RESOLVER_STYLE, "OTHER", "Invalid value.. expects one of [smart, strict, " +
+        "lenient]" });
     return list;
   }
 

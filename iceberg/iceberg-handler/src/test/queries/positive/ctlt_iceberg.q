@@ -1,5 +1,3 @@
--- Mask the totalSize value as it can have slight variability, causing test flakiness
---! qt:replace:/(\s+totalSize\s+)\S+(\s+)/$1#Masked#$2/
 -- Mask random uuid
 --! qt:replace:/(\s+'uuid'=')\S+('\s*)/$1#Masked#$2/
 
@@ -45,3 +43,15 @@ create table emp_like2 like emp stored by iceberg;
 -- Partition column should be there
 show create table emp_like2;
 
+set hive.support.concurrency=true;
+set hive.txn.manager=org.apache.hadoop.hive.ql.lockmgr.DbTxnManager;
+
+-- create a managed table
+create managed table man_table (id int) Stored as orc TBLPROPERTIES ('transactional'='true');
+
+create table like_man_table like man_table stored by iceberg;
+
+-- insert some data into the table and see if things work
+insert into like_man_table values (1), (2), (3), (4);
+
+select * from like_man_table order by id;

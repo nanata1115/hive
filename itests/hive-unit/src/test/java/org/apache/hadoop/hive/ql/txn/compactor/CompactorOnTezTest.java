@@ -45,7 +45,6 @@ import org.junit.BeforeClass;
 import org.junit.ClassRule;
 import org.junit.rules.TemporaryFolder;
 
-import java.io.EOFException;
 import java.io.File;
 import java.io.IOException;
 import java.util.Collections;
@@ -59,6 +58,7 @@ import java.util.regex.Pattern;
 
 import static org.apache.hadoop.hive.ql.txn.compactor.CompactorTestUtil.executeStatementOnDriverAndReturnResults;
 import static org.apache.hadoop.hive.ql.txn.compactor.TestCompactor.executeStatementOnDriver;
+import static org.apache.hadoop.hive.ql.txn.compactor.TestCompactor.dropTables;
 
 /**
  * Superclass for Test[Crud|Mm]CompactorOnTez, for setup and helper classes.
@@ -102,11 +102,11 @@ public abstract class CompactorOnTezTest {
     if (!(new File(TEST_WAREHOUSE_DIR).mkdirs())) {
       throw new RuntimeException("Could not create " + TEST_WAREHOUSE_DIR);
     }
-    hiveConf.setVar(HiveConf.ConfVars.PREEXECHOOKS, "");
-    hiveConf.setVar(HiveConf.ConfVars.POSTEXECHOOKS, "");
-    hiveConf.setVar(HiveConf.ConfVars.METASTOREWAREHOUSE, TEST_WAREHOUSE_DIR);
-    hiveConf.setVar(HiveConf.ConfVars.HIVEINPUTFORMAT, HiveInputFormat.class.getName());
-    hiveConf.setVar(HiveConf.ConfVars.HIVEFETCHTASKCONVERSION, "none");
+    hiveConf.setVar(HiveConf.ConfVars.PRE_EXEC_HOOKS, "");
+    hiveConf.setVar(HiveConf.ConfVars.POST_EXEC_HOOKS, "");
+    hiveConf.setVar(HiveConf.ConfVars.METASTORE_WAREHOUSE, TEST_WAREHOUSE_DIR);
+    hiveConf.setVar(HiveConf.ConfVars.HIVE_INPUT_FORMAT, HiveInputFormat.class.getName());
+    hiveConf.setVar(HiveConf.ConfVars.HIVE_FETCH_TASK_CONVERSION, "none");
     MetastoreConf.setTimeVar(hiveConf, MetastoreConf.ConfVars.TXN_OPENTXN_TIMEOUT, 2, TimeUnit.SECONDS);
     MetastoreConf.setBoolVar(hiveConf, MetastoreConf.ConfVars.COMPACTOR_INITIATOR_ON, true);
     MetastoreConf.setBoolVar(hiveConf, MetastoreConf.ConfVars.COMPACTOR_CLEANER_ON, true);
@@ -190,31 +190,28 @@ public abstract class CompactorOnTezTest {
   protected HiveHookEvents.HiveHookEventProto getRelatedTezEvent(String dbTableName) throws Exception {
     int retryCount = 3;
     while (retryCount-- > 0) {
-      try {
-        List<ProtoMessageReader<HiveHookEvents.HiveHookEventProto>> readers = TestHiveProtoLoggingHook.getTestReader(conf, tmpFolder);
-        for (ProtoMessageReader<HiveHookEvents.HiveHookEventProto> reader : readers) {
-          HiveHookEvents.HiveHookEventProto event = reader.readEvent();
-          boolean getRelatedEvent = false;
-          while (!getRelatedEvent) {
-            while (event != null && ExecutionMode.TEZ != ExecutionMode.valueOf(event.getExecutionMode())) {
-              event = reader.readEvent();
+      List<ProtoMessageReader<HiveHookEvents.HiveHookEventProto>> readers = TestHiveProtoLoggingHook.getTestReader(conf, tmpFolder);
+      for (ProtoMessageReader<HiveHookEvents.HiveHookEventProto> reader : readers) {
+        do {
+          HiveHookEvents.HiveHookEventProto event;
+          try {
+            if ((event = reader.readEvent()) == null) {
+              break;
             }
-            // Tables read is the table picked for compaction.
-            if (event != null && event.getTablesReadCount() > 0 && dbTableName.equalsIgnoreCase(event.getTablesRead(0))) {
-              getRelatedEvent = true;
-            } else {
-              event = reader.readEvent();
-            }
+          } catch (IOException e) {
+            //IO error, or reached end of current event file. Advancing to next.
+            break;
           }
-          if (getRelatedEvent) {
+          if (ExecutionMode.TEZ.equals(ExecutionMode.valueOf(event.getExecutionMode())) &&
+              event.getTablesReadCount() > 0 &&
+              dbTableName.equalsIgnoreCase(event.getTablesRead(0))) {
             return event;
           }
-        }
-      } catch (EOFException e) {
-        //Since Event writing is async it may happen that the event we are looking for is not yet written out.
-        //Let's retry it after waiting a bit
-        Thread.sleep(2000);
+        } while (true);
       }
+      //Since Event writing is async it may happen that the event we are looking for is not yet written out.
+      //Let's retry it after waiting a bit
+      Thread.sleep(3000);
     }
     return null;
   }
@@ -256,7 +253,8 @@ public abstract class CompactorOnTezTest {
       if (dbName != null) {
         tblName = dbName + "." + tblName;
       }
-      executeStatementOnDriver("drop table if exists " + tblName, driver);
+      dropTables(driver, tblName);
+      
       StringBuilder query = new StringBuilder();
       query.append("create table ").append(tblName).append(" (a string, b int)");
       if (isPartitioned) {
@@ -380,8 +378,8 @@ public abstract class CompactorOnTezTest {
         tblName = dbName + "." + tblName;
         tempTblName = dbName + "." + tempTblName;
       }
-
-      executeStatementOnDriver("drop table if exists " + tblName, driver);
+      dropTables(driver, tblName);
+      
       StringBuilder query = new StringBuilder();
       query.append("create table ").append(tblName).append(" (a string, b string, c string)");
       query.append(" stored as orc");
@@ -537,7 +535,7 @@ public abstract class CompactorOnTezTest {
           actualFileName = m.group(2);
         }
 
-        if (expectedFileName == null || actualFileName == null || !expectedFileName.equals(actualFileName)) {
+        if (expectedFileName == null || !expectedFileName.equals(actualFileName)) {
           return false;
         }
       }

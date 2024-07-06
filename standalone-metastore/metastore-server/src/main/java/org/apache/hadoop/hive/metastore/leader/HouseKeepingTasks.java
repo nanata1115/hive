@@ -23,6 +23,7 @@ import org.apache.hadoop.hive.metastore.HiveMetaStore;
 import org.apache.hadoop.hive.metastore.MetastoreTaskThread;
 import org.apache.hadoop.hive.metastore.ThreadPool;
 import org.apache.hadoop.hive.metastore.conf.MetastoreConf;
+import org.apache.hadoop.hive.metastore.txn.service.CompactionHouseKeeperService;
 import org.apache.hadoop.hive.metastore.utils.JavaUtils;
 
 import java.util.ArrayList;
@@ -41,6 +42,8 @@ public class HouseKeepingTasks implements LeaderElection.LeadershipStateListener
 
   private boolean runOnlyRemoteTasks;
 
+  private List<MetastoreTaskThread> runningTasks;
+
   public HouseKeepingTasks(Configuration configuration, boolean runOnlyRemoteTasks) {
     this.configuration = new Configuration(requireNonNull(configuration,
         "configuration is null"));
@@ -56,9 +59,15 @@ public class HouseKeepingTasks implements LeaderElection.LeadershipStateListener
         MetastoreConf.ConfVars.METASTORE_HOUSEKEEPING_THREADS_ON)) {
       return remoteOnlyTasks;
     }
+    boolean isCompactorEnabled = MetastoreConf.getBoolVar(configuration, MetastoreConf.ConfVars.COMPACTOR_INITIATOR_ON)
+            || MetastoreConf.getBoolVar(configuration, MetastoreConf.ConfVars.COMPACTOR_CLEANER_ON);
+
     Collection<String> taskNames =
         MetastoreConf.getStringCollection(configuration, MetastoreConf.ConfVars.TASK_THREADS_REMOTE_ONLY);
     for (String taskName : taskNames) {
+      if (CompactionHouseKeeperService.class.getName().equals(taskName) && !isCompactorEnabled) {
+        continue;
+      }
       MetastoreTaskThread task =
           JavaUtils.newInstance(JavaUtils.getClass(taskName, MetastoreTaskThread.class));
       remoteOnlyTasks.add(task);
@@ -84,6 +93,7 @@ public class HouseKeepingTasks implements LeaderElection.LeadershipStateListener
     if (metastoreTaskThreadPool != null) {
       throw new IllegalStateException("There should be no running tasks before taking the leadership!");
     }
+    runningTasks = new ArrayList<>();
     metastoreTaskThreadPool = ThreadPool.initialize(configuration);
     if (!runOnlyRemoteTasks) {
       List<MetastoreTaskThread> alwaysTasks = new ArrayList<>(getAlwaysTasks());
@@ -93,7 +103,7 @@ public class HouseKeepingTasks implements LeaderElection.LeadershipStateListener
         // For backwards compatibility, since some threads used to be hard coded but only run if
         // frequency was > 0
         if (freq > 0) {
-          HiveMetaStore.LOG.info("Scheduling for " + task.getClass().getCanonicalName() + " service.");
+          runningTasks.add(task);
           metastoreTaskThreadPool.getPool().scheduleAtFixedRate(task, freq, freq, TimeUnit.MILLISECONDS);
         }
       }
@@ -102,10 +112,14 @@ public class HouseKeepingTasks implements LeaderElection.LeadershipStateListener
       for (MetastoreTaskThread task : remoteOnlyTasks) {
         task.setConf(configuration);
         long freq = task.runFrequency(TimeUnit.MILLISECONDS);
-        HiveMetaStore.LOG.info("Scheduling for " + task.getClass().getCanonicalName() + " service.");
+        runningTasks.add(task);
         metastoreTaskThreadPool.getPool().scheduleAtFixedRate(task, freq, freq, TimeUnit.MILLISECONDS);
       }
     }
+
+    runningTasks.forEach(task -> {
+      HiveMetaStore.LOG.info("Scheduling for " + task.getClass().getCanonicalName() + " service.");
+    });
   }
 
   @Override
@@ -113,6 +127,13 @@ public class HouseKeepingTasks implements LeaderElection.LeadershipStateListener
     if (metastoreTaskThreadPool != null) {
       metastoreTaskThreadPool.shutdown();
       metastoreTaskThreadPool = null;
+    }
+
+    if (runningTasks != null && !runningTasks.isEmpty()) {
+      runningTasks.forEach(task -> {
+        HiveMetaStore.LOG.info("Stopped the Housekeeping task: {}", task.getClass().getCanonicalName());
+      });
+      runningTasks.clear();
     }
   }
 

@@ -32,6 +32,7 @@ import java.util.Set;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.regex.Pattern;
 
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.fs.FileChecksum;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
@@ -51,7 +52,10 @@ import org.apache.hadoop.hive.metastore.api.WMResourcePlanStatus;
 import org.apache.hadoop.hive.metastore.api.hive_metastoreConstants;
 import org.apache.hadoop.hive.metastore.conf.MetastoreConf;
 import org.apache.hadoop.hive.metastore.events.InsertEvent;
+import org.apache.hadoop.hive.ql.ddl.table.partition.PartitionUtils;
+import org.apache.hadoop.hive.ql.exec.SerializationUtilities;
 import org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat;
+import org.apache.hadoop.hive.ql.plan.ExprNodeColumnDesc;
 import org.apache.hadoop.hive.ql.plan.ExprNodeConstantDesc;
 import org.apache.hadoop.hive.ql.plan.ExprNodeDesc;
 import org.apache.hadoop.hive.ql.plan.ExprNodeGenericFuncDesc;
@@ -86,8 +90,8 @@ import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.fail;
-import org.junit.BeforeClass;
 import org.junit.AfterClass;
+import org.junit.BeforeClass;
 import org.junit.Test;
 
 /**
@@ -101,8 +105,15 @@ public class TestHive {
   @BeforeClass
   public static void setUp() throws Exception {
 
-    hiveConf = new HiveConf(TestHive.class);
+    hiveConf = getNewConf(null);
     hm = setUpImpl(hiveConf);
+  }
+
+  private static HiveConf getNewConf(HiveConf oldConf) {
+    HiveConf conf = oldConf == null ? new HiveConf(TestHive.class) : new HiveConf(oldConf, TestHive.class);
+    //TODO: HIVE-28289: TestHive/TestHiveRemote to run on Tez
+    conf.setVar(HiveConf.ConfVars.HIVE_EXECUTION_ENGINE, "mr");
+    return conf;
   }
 
   private static Hive setUpImpl(HiveConf hiveConf) throws Exception {
@@ -465,14 +476,16 @@ public class TestHive {
 
   @Test
   public void testWmNamespaceHandling() throws Throwable {
-    HiveConf hiveConf = new HiveConf(this.getClass());
+    HiveConf hiveConf = getNewConf(null);
     Hive hm = setUpImpl(hiveConf);
     // TODO: threadlocals... Why is all this Hive client stuff like that?!!
     final AtomicReference<Hive> hm2r = new AtomicReference<>();
     Thread pointlessThread = new Thread(new Runnable() {
       @Override
       public void run() {
-        HiveConf hiveConf2 = new HiveConf(this.getClass());
+        HiveConf hiveConf2 = getNewConf(null);
+        //TODO: HIVE-28289: TestHive/TestHiveRemote to run on Tez
+        hiveConf2.setVar(HiveConf.ConfVars.HIVE_EXECUTION_ENGINE, "mr");
         hiveConf2.setVar(ConfVars.HIVE_SERVER2_WM_NAMESPACE, "hm2");
         try {
           hm2r.set(setUpImpl(hiveConf2));
@@ -634,8 +647,8 @@ public class TestHive {
                                                  .put("ds", "20141216")
                                                  .put("hr", "12")
                                                  .build();
-
-      int trashSizeBeforeDrop = getTrashContents().length;
+      FileStatus[] trashContentsBeforeDrop = getTrashContents();
+      int trashSizeBeforeDrop = trashContentsBeforeDrop.length;
 
       Table table = createPartitionedTable(dbName, tableName);
       hm.createPartition(table, partitionSpec);
@@ -668,16 +681,56 @@ public class TestHive {
                                            .purgeData(false)
                       );
 
-      int trashSizeWithoutPurge = getTrashContents().length;
+      FileStatus[] trashContentsWithoutPurge = getTrashContents();
+      int trashSizeWithoutPurge = trashContentsWithoutPurge.length;
 
-      assertEquals("After dropPartitions(noPurge), data should've gone to trash!",
-                  trashSizeBeforeDrop, trashSizeWithoutPurge);
-
+      assertEquals("After dropPartitions(noPurge), data should've gone to trash, contents before drop: "
+          + Arrays.asList(trashContentsBeforeDrop) + ", contents without purge: " + Arrays.asList(trashContentsWithoutPurge)
+          + "!", trashSizeBeforeDrop, trashSizeWithoutPurge);
     }
     catch (Exception e) {
       fail("Unexpected exception: " + StringUtils.stringifyException(e));
     }
     finally {
+      cleanUpTableQuietly(dbName, tableName);
+    }
+  }
+
+  @Test
+  public void testDropMissingPartitionsByFilter() throws Throwable {
+    String dbName = Warehouse.DEFAULT_DATABASE_NAME;
+    String tableName = "table_for_testDropMissingPartitionsByFilter";
+
+    Table table = createPartitionedTable(dbName, tableName);
+    for (int i = 10; i <= 12; i++) {
+      Map<String, String> partitionSpec = new ImmutableMap.Builder<String, String>()
+          .put("ds", "20231129")
+          .put("hr", String.valueOf(i))
+          .build();
+      hm.createPartition(table, partitionSpec);
+    }
+
+    List<Partition> partitions = hm.getPartitions(table);
+    assertEquals(3, partitions.size());
+
+    // drop partitions by filter with missing predicate
+    try {
+      List<Pair<Integer, byte[]>> partExprs = new ArrayList<>();
+      ExprNodeColumnDesc column = new ExprNodeColumnDesc(
+          TypeInfoFactory.stringTypeInfo, "ds", null, true);
+      List<String> values = Arrays.asList("20231130", "20231129");
+      for (int i = 0; i < values.size(); i++) {
+        ExprNodeGenericFuncDesc expr = PartitionUtils.makeBinaryPredicate(
+            "=", column, new ExprNodeConstantDesc(TypeInfoFactory.stringTypeInfo, values.get(i)));
+        partExprs.add(Pair.of(i, SerializationUtilities.serializeObjectWithTypeInformation(expr)));
+      }
+      hm.dropPartitions(dbName, tableName, partExprs, PartitionDropOptions.instance());
+      fail("Expected exception");
+    } catch (HiveException e) {
+      // expected
+      assertEquals("Some partitions to drop are missing", e.getCause().getMessage());
+      assertEquals(3, hm.getPartitions(table).size());
+    } finally {
       cleanUpTableQuietly(dbName, tableName);
     }
   }
@@ -838,11 +891,70 @@ public class TestHive {
       partialSpec.put("hr", "14");
       assertEquals(1, hm.getPartitions(tbl, partialSpec).size());
 
+      // Test get partitions with max_parts
+      assertEquals(1, hm.getPartitions(tbl, new HashMap(), (short) 1).size());
+
       hm.dropTable(Warehouse.DEFAULT_DATABASE_NAME, tableName);
     } catch (Throwable e) {
       System.err.println(StringUtils.stringifyException(e));
       System.err.println("testPartition() failed");
       throw e;
+    }
+  }
+
+  @Test
+  public void testGetPartitionsWithMaxLimit() throws Exception {
+    String dbName = Warehouse.DEFAULT_DATABASE_NAME;
+    String tableName = "table_for_get_partitions_with_max_limit";
+
+    try {
+      Map<String, String> part_spec = new HashMap<String, String>();
+
+      Table table = createPartitionedTable(dbName, tableName);
+      part_spec.clear();
+      part_spec.put("ds", "2025-06-30");
+      part_spec.put("hr", "11");
+      hm.createPartition(table, part_spec);
+
+      Thread.sleep(1);
+      part_spec.clear();
+      part_spec.put("ds", "2023-04-15");
+      part_spec.put("hr", "12");
+      hm.createPartition(table, part_spec);
+
+      Thread.sleep(1);
+      part_spec.clear();
+      part_spec.put("ds", "2023-09-01");
+      part_spec.put("hr", "10");
+      hm.createPartition(table, part_spec);
+
+      // Default
+      Assert.assertEquals(
+          ((List<Partition>) hm.getPartitions(table, new HashMap(), (short) 1)).get(0).getTPartition().getValues(),
+          Arrays.asList("2023-04-15", "12"));
+
+      // Sort by "PARTITIONS"."CREATE_TIME" desc
+      hm.setMetaConf(MetastoreConf.ConfVars.PARTITION_ORDER_EXPR.getVarname(), "\"PARTITIONS\".\"CREATE_TIME\" desc");
+      Assert.assertEquals(
+          ((List<Partition>) hm.getPartitions(table, new HashMap(), (short) 1)).get(0).getTPartition().getValues(),
+          Arrays.asList("2023-09-01", "10"));
+
+      // Sort by "PART_NAME" desc
+      hm.setMetaConf(MetastoreConf.ConfVars.PARTITION_ORDER_EXPR.getVarname(), "\"PART_NAME\" desc");
+      Assert.assertEquals(
+          ((List<Partition>) hm.getPartitions(table, new HashMap(), (short) 1)).get(0).getTPartition().getValues(),
+          Arrays.asList("2025-06-30", "11"));
+
+      // Test MetaStoreClient
+      Assert.assertEquals(
+          hm.getMSC().listPartitions(table.getDbName(), table.getTableName(), (short) 1).get(0).getValues(),
+          Arrays.asList("2025-06-30", "11"));
+    } catch (Exception e) {
+      fail("Unexpected exception: " + StringUtils.stringifyException(e));
+    } finally {
+      hm.setMetaConf(MetastoreConf.ConfVars.PARTITION_ORDER_EXPR.getVarname(),
+         MetastoreConf.ConfVars.PARTITION_ORDER_EXPR.getDefaultVal().toString());
+      cleanUpTableQuietly(dbName, tableName);
     }
   }
 
@@ -871,7 +983,7 @@ public class TestHive {
     Hive newHiveObj;
 
     //if HiveConf has not changed, same object should be returned
-    HiveConf newHconf = new HiveConf(hiveConf);
+    HiveConf newHconf = getNewConf(hiveConf);
     newHiveObj = Hive.get(newHconf);
     assertTrue(prevHiveObj == newHiveObj);
 
@@ -883,9 +995,9 @@ public class TestHive {
     prevHiveObj = Hive.get();
     prevHiveObj.getDatabaseCurrent();
     //change value of a metavar config param in new hive conf
-    newHconf = new HiveConf(hiveConf);
-    newHconf.setIntVar(ConfVars.METASTORETHRIFTCONNECTIONRETRIES,
-        newHconf.getIntVar(ConfVars.METASTORETHRIFTCONNECTIONRETRIES) + 1);
+    newHconf = getNewConf(hiveConf);
+    newHconf.setIntVar(ConfVars.METASTORE_THRIFT_CONNECTION_RETRIES,
+        newHconf.getIntVar(ConfVars.METASTORE_THRIFT_CONNECTION_RETRIES) + 1);
     newHiveObj = Hive.get(newHconf);
     assertTrue(prevHiveObj != newHiveObj);
   }

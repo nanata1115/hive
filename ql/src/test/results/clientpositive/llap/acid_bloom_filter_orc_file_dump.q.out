@@ -1,7 +1,9 @@
 PREHOOK: query: DROP TABLE if exists bloomTest
 PREHOOK: type: DROPTABLE
+PREHOOK: Output: database:default
 POSTHOOK: query: DROP TABLE if exists bloomTest
 POSTHOOK: type: DROPTABLE
+POSTHOOK: Output: database:default
 PREHOOK: query: CREATE TABLE bloomTest(
   msisdn  STRING,
   imsi    VARCHAR(20),
@@ -76,7 +78,7 @@ PREHOOK: Input: default@bloomtest
 #### A masked pattern was here ####
 -- BEGIN ORC FILE DUMP --
 #### A masked pattern was here ####
-File Version: 0.12 with ORC_14 by ORC Java 1.8.3
+File Version:#Masked#
 Rows: 1
 Compression: ZLIB
 Compression size: 32768
@@ -193,7 +195,7 @@ ________________________________________________________________________________
 -- END ORC FILE DUMP --
 -- BEGIN ORC FILE DUMP --
 #### A masked pattern was here ####
-File Version: 0.12 with ORC_14 by ORC Java 1.8.3
+File Version:#Masked#
 Rows: 1
 Compression: ZLIB
 Compression size: 32768

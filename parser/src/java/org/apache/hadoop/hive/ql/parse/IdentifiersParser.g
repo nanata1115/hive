@@ -327,7 +327,7 @@ castExpression
     LPAREN
           expression
           KW_AS
-          toType=primitiveType
+          toType=type
           (fmt=KW_FORMAT StringLiteral)?
     RPAREN
     // simple cast
@@ -985,6 +985,9 @@ nonReserved
     | KW_EXPIRE_SNAPSHOTS
     | KW_SET_CURRENT_SNAPSHOT
     | KW_BRANCH | KW_SNAPSHOTS | KW_RETAIN | KW_RETENTION
+    | KW_TAG
+    | KW_FAST_FORWARD
+    | KW_OPTIMIZE
 ;
 
 //The following SQL2011 reserved keywords are used as function name only, but not as identifiers.

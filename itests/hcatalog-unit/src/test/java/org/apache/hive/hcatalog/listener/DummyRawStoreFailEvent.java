@@ -117,6 +117,7 @@ import org.apache.hadoop.hive.metastore.api.WMNullablePool;
 import org.apache.hadoop.hive.metastore.api.WriteEventInfo;
 import org.apache.hadoop.hive.metastore.api.ReplicationMetricList;
 import org.apache.hadoop.hive.metastore.api.GetReplicationMetricsRequest;
+import org.apache.hadoop.hive.metastore.client.builder.GetPartitionsArgs;
 import org.apache.hadoop.hive.metastore.model.MTable;
 import org.apache.hadoop.hive.metastore.partition.spec.PartitionSpecProxy;
 import org.apache.hadoop.hive.metastore.utils.MetaStoreServerUtils.ColStatsObjWithSourceInfo;
@@ -471,10 +472,16 @@ public class DummyRawStoreFailEvent implements RawStore, Configurable {
   @Override
   public List<String> listPartitionNames(String catName, String dbName, String tblName,
       String defaultPartName, byte[] exprBytes, String order,
-      short maxParts) throws MetaException, NoSuchObjectException {
+      int maxParts) throws MetaException, NoSuchObjectException {
 
     return objectStore.listPartitionNames(catName, dbName, tblName,
         defaultPartName, exprBytes, order, maxParts);
+  }
+
+  @Override
+  public List<String> listPartitionNamesByFilter(String catName, String dbName, String tblName,
+      GetPartitionsArgs args) throws MetaException, NoSuchObjectException {
+    return objectStore.listPartitionNamesByFilter(catName, dbName, tblName, args);
   }
 
   @Override
@@ -1612,5 +1619,37 @@ public class DummyRawStoreFailEvent implements RawStore, Configurable {
             String validWriteIds, long writeId)
           throws NoSuchObjectException, MetaException, InvalidObjectException, InvalidInputException {
     return objectStore.updatePartitionColumnStatisticsInBatch(partColStatsMap, tbl, listeners, validWriteIds, writeId);
+  }
+
+  @Override
+  public List<Partition> getPartitions(String catName, String dbName, String tableName, GetPartitionsArgs args)
+          throws MetaException, NoSuchObjectException {
+    return objectStore.getPartitions(catName, dbName, tableName, args);
+  }
+
+  @Override
+  public List<Partition> getPartitionsByNames(String catName, String dbName, String tblName,
+                                              GetPartitionsArgs args)
+          throws MetaException, NoSuchObjectException {
+    return objectStore.getPartitionsByNames(catName, dbName, tblName, args);
+  }
+
+  @Override
+  public boolean getPartitionsByExpr(String catName, String dbName, String tblName,
+                                     List<Partition> result, GetPartitionsArgs args) throws TException {
+    return objectStore.getPartitionsByExpr(catName, dbName, tblName, result, args);
+  }
+
+  @Override
+  public List<Partition> listPartitionsPsWithAuth(String catName, String dbName, String tblName,
+                                                  GetPartitionsArgs args) throws MetaException, InvalidObjectException, NoSuchObjectException {
+    return objectStore.listPartitionsPsWithAuth(catName, dbName, tblName, args);
+  }
+
+
+  @Override
+  public List<Partition> getPartitionsByFilter(String catName, String dbName, String tblName,
+                                               GetPartitionsArgs args) throws MetaException, NoSuchObjectException {
+    return objectStore.getPartitionsByFilter(catName, dbName, tblName, args);
   }
 }

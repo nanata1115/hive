@@ -24,6 +24,7 @@ import org.apache.hadoop.hive.conf.HiveConf;
 import org.apache.hadoop.hive.metastore.ReplChangeManager;
 import org.apache.hadoop.hive.metastore.api.AllocateTableWriteIdsRequest;
 import org.apache.hadoop.hive.metastore.api.AllocateTableWriteIdsResponse;
+import org.apache.hadoop.hive.metastore.api.AbortTxnRequest;
 import org.apache.hadoop.hive.metastore.api.CommitTxnRequest;
 import org.apache.hadoop.hive.metastore.api.CompactionRequest;
 import org.apache.hadoop.hive.metastore.api.CompactionResponse;
@@ -38,16 +39,16 @@ import org.apache.hadoop.hive.metastore.api.ShowCompactResponseElement;
 import org.apache.hadoop.hive.metastore.api.Table;
 import org.apache.hadoop.hive.metastore.api.TxnType;
 import org.apache.hadoop.hive.metastore.conf.MetastoreConf;
-import org.apache.hadoop.hive.metastore.txn.CompactionInfo;
+import org.apache.hadoop.hive.metastore.txn.entities.CompactionInfo;
 import org.apache.hadoop.hive.metastore.txn.TxnCommonUtils;
 import org.apache.hadoop.hive.metastore.txn.TxnStore;
 import org.apache.hadoop.hive.metastore.txn.TxnUtils;
 import org.apache.hadoop.hive.ql.txn.compactor.handler.TaskHandler;
 import org.apache.hadoop.hive.ql.txn.compactor.handler.TaskHandlerFactory;
-import org.junit.After;
+import org.apache.hive.common.util.ReflectionUtil;
 import org.junit.Assert;
-import org.junit.Test;
-import org.mockito.internal.util.reflection.FieldSetter;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.Test;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -60,6 +61,7 @@ import java.util.Optional;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.stream.Collectors;
 
 import static org.apache.hadoop.hive.conf.HiveConf.ConfVars.HIVE_COMPACTOR_CLEANER_RETENTION_TIME;
 import static org.apache.hadoop.hive.conf.HiveConf.ConfVars.HIVE_COMPACTOR_DELAYED_CLEANUP_ENABLED;
@@ -67,7 +69,6 @@ import static org.apache.hadoop.hive.metastore.conf.MetastoreConf.ConfVars.HIVE_
 import static org.apache.hadoop.hive.metastore.conf.MetastoreConf.getTimeVar;
 import static org.apache.hadoop.hive.ql.io.AcidUtils.addVisibilitySuffix;
 import static org.mockito.ArgumentMatchers.anyLong;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.nullable;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doThrow;
@@ -108,7 +109,7 @@ public class TestCleaner extends CompactorTest {
     FSRemover fsRemover = new FSRemover(conf, ReplChangeManager.getInstance(conf), metadataCache);
     List<TaskHandler> taskHandlers = TaskHandlerFactory.getInstance()
             .getHandlers(conf, mockedHandler, metadataCache, false, fsRemover);
-    doThrow(new RuntimeException(errorMessage)).when(mockedHandler).markCleaned(nullable(CompactionInfo.class), eq(false));
+    doThrow(new RuntimeException(errorMessage)).when(mockedHandler).markCleaned(nullable(CompactionInfo.class));
 
     Table t = newTable("default", "retry_test", false);
 
@@ -133,7 +134,8 @@ public class TestCleaner extends CompactorTest {
       cleaner.setConf(conf);
       cleaner.init(new AtomicBoolean(true));
       cleaner.setCleanupHandlers(taskHandlers);
-      FieldSetter.setField(cleaner, MetaStoreCompactorThread.class.getDeclaredField("txnHandler"), mockedHandler);
+
+      ReflectionUtil.setInAllFields(cleaner, "txnHandler", mockedHandler);
 
       cleaner.run();
 
@@ -160,7 +162,7 @@ public class TestCleaner extends CompactorTest {
     cleaner.setConf(conf);
     cleaner.init(new AtomicBoolean(true));
     cleaner.setCleanupHandlers(taskHandlers);
-    FieldSetter.setField(cleaner, MetaStoreCompactorThread.class.getDeclaredField("txnHandler"), mockedHandler);
+    ReflectionUtil.setInAllFields(cleaner, "txnHandler", mockedHandler);
 
     cleaner.run();
 
@@ -196,14 +198,14 @@ public class TestCleaner extends CompactorTest {
     FSRemover fsRemover = new FSRemover(conf, ReplChangeManager.getInstance(conf), metadataCache);
     List<TaskHandler> taskHandlers = TaskHandlerFactory.getInstance()
             .getHandlers(conf, mockedHandler, metadataCache, false, fsRemover);
-    doThrow(new RuntimeException()).when(mockedHandler).markCleaned(nullable(CompactionInfo.class), eq(false));
+    doThrow(new RuntimeException()).when(mockedHandler).markCleaned(nullable(CompactionInfo.class));
 
     //Do a run to fail the clean and set the retention time
     Cleaner cleaner = new Cleaner();
     cleaner.setConf(conf);
     cleaner.init(new AtomicBoolean(true));
     cleaner.setCleanupHandlers(taskHandlers);
-    FieldSetter.setField(cleaner, MetaStoreCompactorThread.class.getDeclaredField("txnHandler"), mockedHandler);
+    ReflectionUtil.setInAllFields(cleaner, "txnHandler", mockedHandler);
 
     cleaner.run();
 
@@ -219,7 +221,7 @@ public class TestCleaner extends CompactorTest {
     cleaner.setConf(conf);
     cleaner.init(new AtomicBoolean(true));
     cleaner.setCleanupHandlers(taskHandlers);
-    FieldSetter.setField(cleaner, MetaStoreCompactorThread.class.getDeclaredField("txnHandler"), mockedHandler);
+    ReflectionUtil.setInAllFields(cleaner, "txnHandler", mockedHandler);
 
     cleaner.run();
 
@@ -810,7 +812,7 @@ public class TestCleaner extends CompactorTest {
     return false;
   }
 
-  @After
+  @AfterEach
   public void tearDown() throws Exception {
     compactorTestCleanup();
   }
@@ -1116,6 +1118,61 @@ public class TestCleaner extends CompactorTest {
     ShowCompactResponse rsp = txnHandler.showCompact(new ShowCompactRequest());
     Assert.assertEquals("Expected 1 compaction in queue, got: " + rsp.getCompacts(), 1, rsp.getCompactsSize());
     Assert.assertEquals(TxnStore.CLEANING_RESPONSE, rsp.getCompacts().get(0).getState());
+  }
+
+  @Test
+  public void testCompactionHighWatermarkIsHonored() throws Exception {
+    String dbName = "default";
+    String tblName = "trfcp";
+    String partName = "ds=today";
+    Table t = newTable(dbName, tblName, true);
+    Partition p = newPartition(t, "today");
+
+    // minor compaction
+    addBaseFile(t, p, 19L, 19);
+    addDeltaFile(t, p, 20L, 20L, 1);
+    addDeltaFile(t, p, 21L, 21L, 1);
+    addDeltaFile(t, p, 22L, 22L, 1);
+    burnThroughTransactions(dbName, tblName, 22);
+
+    CompactionRequest rqst = new CompactionRequest(dbName, tblName, CompactionType.MINOR);
+    rqst.setPartitionname(partName);
+    long ctxnid = compactInTxn(rqst);
+    addDeltaFile(t, p, 20, 22, 3, ctxnid);
+
+    // block cleaner with an open txn
+    long openTxnId = openTxn();
+
+    //2nd minor
+    addDeltaFile(t, p, 23L, 23L, 1);
+    addDeltaFile(t, p, 24L, 24L, 1);
+    burnThroughTransactions(dbName, tblName, 2);
+
+    rqst = new CompactionRequest(dbName, tblName, CompactionType.MINOR);
+    rqst.setPartitionname(partName);
+    ctxnid = compactInTxn(rqst);
+    addDeltaFile(t, p, 20, 24, 5, ctxnid);
+
+    startCleaner();
+    txnHandler.abortTxn(new AbortTxnRequest(openTxnId));
+
+    ShowCompactResponse rsp = txnHandler.showCompact(new ShowCompactRequest());
+    Assert.assertEquals(2, rsp.getCompactsSize());
+    Assert.assertEquals(TxnStore.SUCCEEDED_RESPONSE, rsp.getCompacts().get(0).getState());
+    Assert.assertEquals(TxnStore.CLEANING_RESPONSE, rsp.getCompacts().get(1).getState());
+
+    List<String> actualDirs = getDirectories(conf, t, p).stream()
+      .map(Path::getName).sorted()
+      .collect(Collectors.toList());
+    
+    List<String> expectedDirs = Arrays.asList(
+      "base_19",
+      addVisibilitySuffix(makeDeltaDirName(20, 22), 23),
+      addVisibilitySuffix(makeDeltaDirName(20, 24), 27),
+      makeDeltaDirName(23, 23),
+      makeDeltaDirName(24, 24)
+    );
+    Assert.assertEquals("Directories do not match", expectedDirs, actualDirs);
   }
 
   private void allocateTableWriteId(String dbName, String tblName, long txnId) throws Exception {

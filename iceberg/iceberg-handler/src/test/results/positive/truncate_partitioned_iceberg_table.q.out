@@ -1,7 +1,9 @@
 PREHOOK: query: drop table if exists test_truncate
 PREHOOK: type: DROPTABLE
+PREHOOK: Output: database:default
 POSTHOOK: query: drop table if exists test_truncate
 POSTHOOK: type: DROPTABLE
+POSTHOOK: Output: database:default
 PREHOOK: query: create external table test_truncate(a int) partitioned by (b string) stored as avro
 PREHOOK: type: CREATETABLE
 PREHOOK: Output: database:default
@@ -99,13 +101,14 @@ Table Parameters:
 	current-snapshot-summary	{\"added-data-files\":\"4\",\"added-records\":\"9\",\"added-files-size\":\"#Masked#\",\"changed-partition-count\":\"4\",\"total-records\":\"9\",\"total-files-size\":\"#Masked#\",\"total-data-files\":\"4\",\"total-delete-files\":\"0\",\"total-position-deletes\":\"0\",\"total-equality-deletes\":\"0\"}
 	current-snapshot-timestamp-ms	#Masked#       
 	default-partition-spec	{\"spec-id\":0,\"fields\":[{\"name\":\"b\",\"transform\":\"identity\",\"source-id\":2,\"field-id\":1000}]}
-	engine.hive.enabled 	true                
 	external.table.purge	true                
+	format-version      	2                   
 	iceberg.orc.files.only	false               
 #### A masked pattern was here ####
 	metadata_location   	hdfs://### HDFS PATH ###
 	numFiles            	4                   
 	numRows             	9                   
+	parquet.compression 	zstd                
 	previous_metadata_location	hdfs://### HDFS PATH ###
 	schema.name-mapping.default	[ {                 
 	                           	  \"field-id\" : 1, 
@@ -117,7 +120,7 @@ Table Parameters:
 	snapshot-count      	1                   
 	storage_handler     	org.apache.iceberg.mr.hive.HiveIcebergStorageHandler
 	table_type          	ICEBERG             
-	totalSize           	#Masked#                
+	totalSize           	#Masked#
 #### A masked pattern was here ####
 	uuid                	#Masked#
 	write.format.default	avro                
@@ -198,13 +201,14 @@ Table Parameters:
 	current-snapshot-summary	{\"deleted-data-files\":\"4\",\"deleted-records\":\"9\",\"removed-files-size\":\"#Masked#\",\"changed-partition-count\":\"4\",\"total-records\":\"0\",\"total-files-size\":\"#Masked#\",\"total-data-files\":\"0\",\"total-delete-files\":\"0\",\"total-position-deletes\":\"0\",\"total-equality-deletes\":\"0\"}
 	current-snapshot-timestamp-ms	#Masked#       
 	default-partition-spec	{\"spec-id\":0,\"fields\":[{\"name\":\"b\",\"transform\":\"identity\",\"source-id\":2,\"field-id\":1000}]}
-	engine.hive.enabled 	true                
 	external.table.purge	true                
+	format-version      	2                   
 	iceberg.orc.files.only	false               
 #### A masked pattern was here ####
 	metadata_location   	hdfs://### HDFS PATH ###
 	numFiles            	0                   
 	numRows             	0                   
+	parquet.compression 	zstd                
 	previous_metadata_location	hdfs://### HDFS PATH ###
 	schema.name-mapping.default	[ {                 
 	                           	  \"field-id\" : 1, 
@@ -216,7 +220,7 @@ Table Parameters:
 	snapshot-count      	2                   
 	storage_handler     	org.apache.iceberg.mr.hive.HiveIcebergStorageHandler
 	table_type          	ICEBERG             
-	totalSize           	#Masked#                   
+	totalSize           	#Masked#
 #### A masked pattern was here ####
 	uuid                	#Masked#
 	write.format.default	avro                
@@ -230,8 +234,10 @@ Sort Columns:       	[]
 PREHOOK: query: drop table if exists test_truncate
 PREHOOK: type: DROPTABLE
 PREHOOK: Input: default@test_truncate
+PREHOOK: Output: database:default
 PREHOOK: Output: default@test_truncate
 POSTHOOK: query: drop table if exists test_truncate
 POSTHOOK: type: DROPTABLE
 POSTHOOK: Input: default@test_truncate
+POSTHOOK: Output: database:default
 POSTHOOK: Output: default@test_truncate

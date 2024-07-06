@@ -61,7 +61,7 @@ import org.apache.hadoop.hive.metastore.api.TxnToWriteId;
 import org.apache.hadoop.hive.metastore.api.hive_metastoreConstants;
 import org.apache.hadoop.hive.metastore.conf.MetastoreConf;
 import org.apache.hadoop.hive.metastore.metrics.AcidMetricService;
-import org.apache.hadoop.hive.metastore.txn.CompactionInfo;
+import org.apache.hadoop.hive.metastore.txn.entities.CompactionInfo;
 import org.apache.hadoop.hive.metastore.txn.TxnCommonUtils;
 import org.apache.hadoop.hive.metastore.utils.TestTxnDbUtil;
 import org.apache.hadoop.hive.metastore.txn.TxnStore;
@@ -85,6 +85,7 @@ import org.apache.hadoop.util.Progressable;
 import org.apache.hive.common.util.HiveVersionInfo;
 import org.apache.thrift.TException;
 import org.junit.Before;
+import org.junit.jupiter.api.BeforeEach;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -127,8 +128,9 @@ public abstract class CompactorTest {
   private final AtomicBoolean stop = new AtomicBoolean();
   private Path tmpdir;
   FileSystem fs;
-  
+
   @Before
+  @BeforeEach
   public void setup() throws Exception {
     setup(new HiveConf());
   }

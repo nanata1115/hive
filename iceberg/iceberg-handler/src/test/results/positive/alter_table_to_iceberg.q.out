@@ -1,7 +1,9 @@
 PREHOOK: query: drop table if exists tbl_orc
 PREHOOK: type: DROPTABLE
+PREHOOK: Output: database:default
 POSTHOOK: query: drop table if exists tbl_orc
 POSTHOOK: type: DROPTABLE
+POSTHOOK: Output: database:default
 PREHOOK: query: create external table tbl_orc(a int, b string) stored as orc
 PREHOOK: type: CREATETABLE
 PREHOOK: Output: database:default
@@ -33,7 +35,7 @@ Table Parameters:
 	numFiles            	0                   
 	numRows             	0                   
 	rawDataSize         	0                   
-	totalSize           	#Masked#                   
+	totalSize           	#Masked#
 #### A masked pattern was here ####
 	 	 
 # Storage Information	 	 
@@ -110,12 +112,13 @@ Table Parameters:
 	current-snapshot-id 	#Masked#
 	current-snapshot-summary	{\"added-data-files\":\"1\",\"added-records\":\"5\",\"added-files-size\":\"#Masked#\",\"changed-partition-count\":\"1\",\"total-records\":\"5\",\"total-files-size\":\"#Masked#\",\"total-data-files\":\"1\",\"total-delete-files\":\"0\",\"total-position-deletes\":\"0\",\"total-equality-deletes\":\"0\"}
 	current-snapshot-timestamp-ms	#Masked#       
-	engine.hive.enabled 	true                
+	format-version      	2                   
 	iceberg.orc.files.only	true                
 #### A masked pattern was here ####
 	metadata_location   	hdfs://### HDFS PATH ###
 	numFiles            	1                   
 	numRows             	5                   
+	parquet.compression 	zstd                
 	previous_metadata_location	hdfs://### HDFS PATH ###
 	rawDataSize         	455                 
 	schema.name-mapping.default	[ {                 
@@ -128,7 +131,7 @@ Table Parameters:
 	snapshot-count      	1                   
 	storage_handler     	org.apache.iceberg.mr.hive.HiveIcebergStorageHandler
 	table_type          	ICEBERG             
-	totalSize           	#Masked#                 
+	totalSize           	#Masked#
 #### A masked pattern was here ####
 	uuid                	#Masked#
 	write.format.default	orc                 
@@ -155,15 +158,19 @@ POSTHOOK: Output: hdfs://### HDFS PATH ###
 PREHOOK: query: drop table tbl_orc
 PREHOOK: type: DROPTABLE
 PREHOOK: Input: default@tbl_orc
+PREHOOK: Output: database:default
 PREHOOK: Output: default@tbl_orc
 POSTHOOK: query: drop table tbl_orc
 POSTHOOK: type: DROPTABLE
 POSTHOOK: Input: default@tbl_orc
+POSTHOOK: Output: database:default
 POSTHOOK: Output: default@tbl_orc
 PREHOOK: query: drop table if exists tbl_parquet
 PREHOOK: type: DROPTABLE
+PREHOOK: Output: database:default
 POSTHOOK: query: drop table if exists tbl_parquet
 POSTHOOK: type: DROPTABLE
+POSTHOOK: Output: database:default
 PREHOOK: query: create external table tbl_parquet(a int, b string) stored as parquet
 PREHOOK: type: CREATETABLE
 PREHOOK: Output: database:default
@@ -195,7 +202,7 @@ Table Parameters:
 	numFiles            	0                   
 	numRows             	0                   
 	rawDataSize         	0                   
-	totalSize           	#Masked#                   
+	totalSize           	#Masked#
 #### A masked pattern was here ####
 	 	 
 # Storage Information	 	 
@@ -272,12 +279,13 @@ Table Parameters:
 	current-snapshot-id 	#Masked#
 	current-snapshot-summary	{\"added-data-files\":\"1\",\"added-records\":\"5\",\"added-files-size\":\"#Masked#\",\"changed-partition-count\":\"1\",\"total-records\":\"5\",\"total-files-size\":\"#Masked#\",\"total-data-files\":\"1\",\"total-delete-files\":\"0\",\"total-position-deletes\":\"0\",\"total-equality-deletes\":\"0\"}
 	current-snapshot-timestamp-ms	#Masked#       
-	engine.hive.enabled 	true                
+	format-version      	2                   
 	iceberg.orc.files.only	false               
 #### A masked pattern was here ####
 	metadata_location   	hdfs://### HDFS PATH ###
 	numFiles            	1                   
 	numRows             	5                   
+	parquet.compression 	zstd                
 	previous_metadata_location	hdfs://### HDFS PATH ###
 	rawDataSize         	116                 
 	schema.name-mapping.default	[ {                 
@@ -290,7 +298,7 @@ Table Parameters:
 	snapshot-count      	1                   
 	storage_handler     	org.apache.iceberg.mr.hive.HiveIcebergStorageHandler
 	table_type          	ICEBERG             
-	totalSize           	#Masked#                 
+	totalSize           	#Masked#
 #### A masked pattern was here ####
 	uuid                	#Masked#
 	write.format.default	parquet             
@@ -317,15 +325,19 @@ POSTHOOK: Output: hdfs://### HDFS PATH ###
 PREHOOK: query: drop table tbl_parquet
 PREHOOK: type: DROPTABLE
 PREHOOK: Input: default@tbl_parquet
+PREHOOK: Output: database:default
 PREHOOK: Output: default@tbl_parquet
 POSTHOOK: query: drop table tbl_parquet
 POSTHOOK: type: DROPTABLE
 POSTHOOK: Input: default@tbl_parquet
+POSTHOOK: Output: database:default
 POSTHOOK: Output: default@tbl_parquet
 PREHOOK: query: drop table if exists tbl_avro
 PREHOOK: type: DROPTABLE
+PREHOOK: Output: database:default
 POSTHOOK: query: drop table if exists tbl_avro
 POSTHOOK: type: DROPTABLE
+POSTHOOK: Output: database:default
 PREHOOK: query: create external table tbl_avro(a int, b string) stored as avro
 PREHOOK: type: CREATETABLE
 PREHOOK: Output: database:default
@@ -357,7 +369,7 @@ Table Parameters:
 	numFiles            	0                   
 	numRows             	0                   
 	rawDataSize         	0                   
-	totalSize           	#Masked#                   
+	totalSize           	#Masked#
 #### A masked pattern was here ####
 	 	 
 # Storage Information	 	 
@@ -434,12 +446,13 @@ Table Parameters:
 	current-snapshot-id 	#Masked#
 	current-snapshot-summary	{\"added-data-files\":\"1\",\"added-records\":\"5\",\"added-files-size\":\"#Masked#\",\"changed-partition-count\":\"1\",\"total-records\":\"5\",\"total-files-size\":\"#Masked#\",\"total-data-files\":\"1\",\"total-delete-files\":\"0\",\"total-position-deletes\":\"0\",\"total-equality-deletes\":\"0\"}
 	current-snapshot-timestamp-ms	#Masked#       
-	engine.hive.enabled 	true                
+	format-version      	2                   
 	iceberg.orc.files.only	false               
 #### A masked pattern was here ####
 	metadata_location   	hdfs://### HDFS PATH ###
 	numFiles            	1                   
 	numRows             	5                   
+	parquet.compression 	zstd                
 	previous_metadata_location	hdfs://### HDFS PATH ###
 	rawDataSize         	0                   
 	schema.name-mapping.default	[ {                 
@@ -452,7 +465,7 @@ Table Parameters:
 	snapshot-count      	1                   
 	storage_handler     	org.apache.iceberg.mr.hive.HiveIcebergStorageHandler
 	table_type          	ICEBERG             
-	totalSize           	#Masked#                 
+	totalSize           	#Masked#
 #### A masked pattern was here ####
 	uuid                	#Masked#
 	write.format.default	avro                
@@ -479,15 +492,19 @@ POSTHOOK: Output: hdfs://### HDFS PATH ###
 PREHOOK: query: drop table tbl_avro
 PREHOOK: type: DROPTABLE
 PREHOOK: Input: default@tbl_avro
+PREHOOK: Output: database:default
 PREHOOK: Output: default@tbl_avro
 POSTHOOK: query: drop table tbl_avro
 POSTHOOK: type: DROPTABLE
 POSTHOOK: Input: default@tbl_avro
+POSTHOOK: Output: database:default
 POSTHOOK: Output: default@tbl_avro
 PREHOOK: query: drop table if exists part_tbl_parquet
 PREHOOK: type: DROPTABLE
+PREHOOK: Output: database:default
 POSTHOOK: query: drop table if exists part_tbl_parquet
 POSTHOOK: type: DROPTABLE
+POSTHOOK: Output: database:default
 PREHOOK: query: create external table part_tbl_parquet (a int) partitioned by (s string) stored as parquet
 PREHOOK: type: CREATETABLE
 PREHOOK: Output: database:default
@@ -536,8 +553,10 @@ POSTHOOK: Output: hdfs://### HDFS PATH ###
 PREHOOK: query: drop table part_tbl_parquet
 PREHOOK: type: DROPTABLE
 PREHOOK: Input: default@part_tbl_parquet
+PREHOOK: Output: database:default
 PREHOOK: Output: default@part_tbl_parquet
 POSTHOOK: query: drop table part_tbl_parquet
 POSTHOOK: type: DROPTABLE
 POSTHOOK: Input: default@part_tbl_parquet
+POSTHOOK: Output: database:default
 POSTHOOK: Output: default@part_tbl_parquet

@@ -127,6 +127,7 @@ import java.util.List;
 import java.util.Map;
 
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.hive.metastore.client.builder.GetPartitionsArgs;
 import org.apache.hadoop.hive.metastore.conf.MetastoreConf;
 import org.apache.hadoop.hive.metastore.model.MTable;
 import org.apache.hadoop.hive.metastore.partition.spec.PartitionSpecProxy;
@@ -140,7 +141,7 @@ import org.junit.Assert;
  *
  * An implementation of RawStore that verifies the DummyJdoConnectionUrlHook has already been
  * applied when this class's setConf method is called, by checking that the value of the
- * METASTORECONNECTURLKEY ConfVar has been updated.
+ * METASTORE_CONNECT_URL_KEY ConfVar has been updated.
  *
  * All non-void methods return default values.
  */
@@ -367,6 +368,12 @@ public class DummyRawStoreForJdoConnection implements RawStore {
   }
 
   @Override
+  public List<Partition> getPartitions(String catName, String dbName, String tblName,
+      GetPartitionsArgs args) throws MetaException, NoSuchObjectException {
+    return Collections.emptyList();
+  }
+
+  @Override
   public Map<String, String> getPartitionLocations(String catName, String dbName, String tblName,
       String baseLocationToNotShow, int max) {
     return Collections.emptyMap();
@@ -446,8 +453,14 @@ public class DummyRawStoreForJdoConnection implements RawStore {
 
   @Override
   public List<String> listPartitionNames(String catName, String dbName, String tblName, String defaultPartName,
-      byte[] exprBytes, String order, short maxParts) throws MetaException, NoSuchObjectException {
+      byte[] exprBytes, String order, int maxParts) throws MetaException, NoSuchObjectException {
 
+    return Collections.emptyList();
+  }
+
+  @Override
+  public List<String> listPartitionNamesByFilter(String catName, String dbName, String tblName,
+      GetPartitionsArgs args) throws MetaException, NoSuchObjectException {
     return Collections.emptyList();
   }
 
@@ -482,6 +495,13 @@ public class DummyRawStoreForJdoConnection implements RawStore {
   }
 
   @Override
+  public List<Partition> getPartitionsByFilter(String catName, String dbName, String tblName,
+       GetPartitionsArgs args)
+       throws MetaException, NoSuchObjectException {
+    return Collections.emptyList();
+  }
+
+  @Override
   public List<Partition> getPartitionSpecsByFilterAndProjection(Table table,
       GetProjectionsSpec projectSpec, GetPartitionsFilterSpec filterSpec)
       throws MetaException, NoSuchObjectException {
@@ -496,8 +516,20 @@ public class DummyRawStoreForJdoConnection implements RawStore {
   }
 
   @Override
+  public List<Partition> getPartitionsByNames(String catName, String dbName, String tblName,
+      GetPartitionsArgs args) throws MetaException, NoSuchObjectException {
+    return Collections.emptyList();
+  }
+
+  @Override
   public boolean getPartitionsByExpr(String catName, String dbName, String tblName, byte[] expr,
       String defaultPartitionName, short maxParts, List<Partition> result) throws TException {
+    return false;
+  }
+
+  @Override
+  public boolean getPartitionsByExpr(String catName, String dbName, String tblName,
+      List<Partition> result, GetPartitionsArgs args) throws TException {
     return false;
   }
 
@@ -735,6 +767,13 @@ public class DummyRawStoreForJdoConnection implements RawStore {
       List<String> part_vals, short max_parts, String userName, List<String> groupNames)
       throws MetaException, InvalidObjectException, NoSuchObjectException {
 
+    return Collections.emptyList();
+  }
+
+  @Override
+  public List<Partition> listPartitionsPsWithAuth(String catName, String db_name, String tbl_name,
+       GetPartitionsArgs args)
+       throws MetaException, InvalidObjectException, NoSuchObjectException {
     return Collections.emptyList();
   }
 

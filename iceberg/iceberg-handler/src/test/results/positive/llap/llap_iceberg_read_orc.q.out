@@ -1,27 +1,39 @@
 PREHOOK: query: DROP TABLE IF EXISTS llap_orders PURGE
 PREHOOK: type: DROPTABLE
+PREHOOK: Output: database:default
 POSTHOOK: query: DROP TABLE IF EXISTS llap_orders PURGE
 POSTHOOK: type: DROPTABLE
+POSTHOOK: Output: database:default
 PREHOOK: query: DROP TABLE IF EXISTS llap_items PURGE
 PREHOOK: type: DROPTABLE
+PREHOOK: Output: database:default
 POSTHOOK: query: DROP TABLE IF EXISTS llap_items PURGE
 POSTHOOK: type: DROPTABLE
+POSTHOOK: Output: database:default
 PREHOOK: query: DROP TABLE IF EXISTS mig_source PURGE
 PREHOOK: type: DROPTABLE
+PREHOOK: Output: database:default
 POSTHOOK: query: DROP TABLE IF EXISTS mig_source PURGE
 POSTHOOK: type: DROPTABLE
+POSTHOOK: Output: database:default
 PREHOOK: query: DROP TABLE IF EXISTS target_ice PURGE
 PREHOOK: type: DROPTABLE
+PREHOOK: Output: database:default
 POSTHOOK: query: DROP TABLE IF EXISTS target_ice PURGE
 POSTHOOK: type: DROPTABLE
+POSTHOOK: Output: database:default
 PREHOOK: query: DROP TABLE IF EXISTS calls PURGE
 PREHOOK: type: DROPTABLE
+PREHOOK: Output: database:default
 POSTHOOK: query: DROP TABLE IF EXISTS calls PURGE
 POSTHOOK: type: DROPTABLE
+POSTHOOK: Output: database:default
 PREHOOK: query: DROP TABLE IF EXISTS display PURGE
 PREHOOK: type: DROPTABLE
+PREHOOK: Output: database:default
 POSTHOOK: query: DROP TABLE IF EXISTS display PURGE
 POSTHOOK: type: DROPTABLE
+POSTHOOK: Output: database:default
 PREHOOK: query: CREATE EXTERNAL TABLE calls (
   s_key bigint,
   year int
@@ -200,11 +212,11 @@ POSTHOOK: Output: default@target_ice
 PREHOOK: query: DELETE FROM target_ice WHERE a = 1
 PREHOOK: type: QUERY
 PREHOOK: Input: default@target_ice
-PREHOOK: Output: default@target_ice
+#### A masked pattern was here ####
 POSTHOOK: query: DELETE FROM target_ice WHERE a = 1
 POSTHOOK: type: QUERY
 POSTHOOK: Input: default@target_ice
-POSTHOOK: Output: default@target_ice
+#### A masked pattern was here ####
 PREHOOK: query: SELECT * FROM target_ice
 PREHOOK: type: QUERY
 PREHOOK: Input: default@target_ice
@@ -243,11 +255,11 @@ POSTHOOK: query: INSERT INTO llap_items VALUES
 POSTHOOK: type: QUERY
 POSTHOOK: Input: _dummy_database@_dummy_table
 POSTHOOK: Output: default@llap_items
-PREHOOK: query: CREATE EXTERNAL TABLE llap_orders (orderid INT, quantity INT, itemid INT, tradets TIMESTAMP) PARTITIONED BY (p1 STRING, p2 STRING) STORED BY ICEBERG STORED AS ORC
+PREHOOK: query: CREATE EXTERNAL TABLE llap_orders (orderid INT, quantity INT, itemid INT, tradets TIMESTAMP) PARTITIONED BY (p1 STRING, P2 STRING) STORED BY ICEBERG STORED AS ORC
 PREHOOK: type: CREATETABLE
 PREHOOK: Output: database:default
 PREHOOK: Output: default@llap_orders
-POSTHOOK: query: CREATE EXTERNAL TABLE llap_orders (orderid INT, quantity INT, itemid INT, tradets TIMESTAMP) PARTITIONED BY (p1 STRING, p2 STRING) STORED BY ICEBERG STORED AS ORC
+POSTHOOK: query: CREATE EXTERNAL TABLE llap_orders (orderid INT, quantity INT, itemid INT, tradets TIMESTAMP) PARTITIONED BY (p1 STRING, P2 STRING) STORED BY ICEBERG STORED AS ORC
 POSTHOOK: type: CREATETABLE
 POSTHOOK: Output: database:default
 POSTHOOK: Output: default@llap_orders
@@ -560,11 +572,11 @@ Cybertruck	4.5	50000
 Model S	NULL	123000
 Model X	2.5	113000
 Model Y	NULL	55000
-PREHOOK: query: ALTER TABLE llap_orders CHANGE tradets ordertime timestamp AFTER p2
+PREHOOK: query: ALTER TABLE llap_orders CHANGE tradets ordertime timestamp AFTER P2
 PREHOOK: type: ALTERTABLE_RENAMECOL
 PREHOOK: Input: default@llap_orders
 PREHOOK: Output: default@llap_orders
-POSTHOOK: query: ALTER TABLE llap_orders CHANGE tradets ordertime timestamp AFTER p2
+POSTHOOK: query: ALTER TABLE llap_orders CHANGE tradets ordertime timestamp AFTER P2
 POSTHOOK: type: ALTERTABLE_RENAMECOL
 POSTHOOK: Input: default@llap_orders
 POSTHOOK: Output: default@llap_orders
@@ -596,11 +608,11 @@ POSTHOOK: Input: default@llap_orders
 #### A masked pattern was here ####
 EU	2000-01-04 19:55:46.129	153
 US	2007-06-24 19:23:22.829	12
-PREHOOK: query: ALTER TABLE llap_orders CHANGE p2 state string
+PREHOOK: query: ALTER TABLE llap_orders CHANGE P2 state string
 PREHOOK: type: ALTERTABLE_RENAMECOL
 PREHOOK: Input: default@llap_orders
 PREHOOK: Output: default@llap_orders
-POSTHOOK: query: ALTER TABLE llap_orders CHANGE p2 state string
+POSTHOOK: query: ALTER TABLE llap_orders CHANGE P2 state string
 POSTHOOK: type: ALTERTABLE_RENAMECOL
 POSTHOOK: Input: default@llap_orders
 POSTHOOK: Output: default@llap_orders

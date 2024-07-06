@@ -167,6 +167,22 @@ const string HIVE_FILTER_FIELD_LAST_ACCESS = "hive_filter_field_last_access__"
 const string HIVE_FILTER_FIELD_TABLE_NAME = "hive_filter_field_tableName__"
 const string HIVE_FILTER_FIELD_TABLE_TYPE = "hive_filter_field_tableType__"
 
+struct PropertySetRequest {
+    1: required string nameSpace;
+    2: map<string, string> propertyMap;
+}
+
+struct PropertyGetRequest {
+    1: required string nameSpace;
+    2: string mapPrefix;
+    3: optional string mapPredicate;
+    4: optional list<string> mapSelection;
+}
+
+struct PropertyGetResponse {
+    1: map<string, map<string , string>> properties;
+}
+
 enum PartitionEventType {
   LOAD_DONE = 1,
 }
@@ -202,6 +218,7 @@ enum CompactionType {
     MINOR = 1,
     MAJOR = 2,
     REBALANCE = 3,
+    ABORT_TXN_CLEANUP = 4,
 }
 
 enum GrantRevokeType {
@@ -583,7 +600,7 @@ struct ColumnStatistics {
 2: required list<ColumnStatisticsObj> statsObj,
 3: optional bool isStatsCompliant, // Are the stats isolation-level-compliant with the
                                                       // the calling query?
-4: optional string engine
+4: optional string engine = "hive"
 }
 
 // FileMetadata represents the table-level (in case of unpartitioned) or partition-level
@@ -708,7 +725,7 @@ struct SetPartitionsStatsRequest {
 2: optional bool needMerge, //stats need to be merged with the existing stats
 3: optional i64 writeId=-1,         // writeId for the current query that updates the stats
 4: optional string validWriteIdList, // valid write id list for the table for which this struct is being sent
-5: required string engine //engine creating the current request
+5: optional string engine = "hive" //engine creating the current request
 }
 
 struct SetPartitionsStatsResponse {
@@ -862,7 +879,10 @@ struct PartitionsByExprRequest {
   6: optional string catName,
   7: optional string order
   8: optional string validWriteIdList,
-  9: optional i64 id=-1 // table id
+  9: optional i64 id=-1, // table id
+  10: optional bool skipColumnSchemaForPartition,
+  11: optional string includeParamKeyPattern,
+  12: optional string excludeParamKeyPattern
 }
 
 struct TableStatsResult {
@@ -881,7 +901,7 @@ struct TableStatsRequest {
  3: required list<string> colNames
  4: optional string catName,
  5: optional string validWriteIdList,  // valid write id list for the table for which this struct is being sent
- 6: required string engine, //engine creating the current request
+ 6: optional string engine = "hive", //engine creating the current request
  7: optional i64 id=-1 // table id
 }
 
@@ -892,13 +912,14 @@ struct PartitionsStatsRequest {
  4: required list<string> partNames,
  5: optional string catName,
  6: optional string validWriteIdList, // valid write id list for the table for which this struct is being sent
- 7: required string engine //engine creating the current request
+ 7: optional string engine = "hive" //engine creating the current request
 }
 
 // Return type for add_partitions_req
 struct AddPartitionsResult {
   1: optional list<Partition> partitions,
-  2: optional bool isStatsCompliant
+  2: optional bool isStatsCompliant,
+  3: optional list<FieldSchema> partitionColSchema
 }
 
 // Request type for add_partitions_req
@@ -909,7 +930,9 @@ struct AddPartitionsRequest {
   4: required bool ifNotExists,
   5: optional bool needResult=true,
   6: optional string catName,
-  7: optional string validWriteIdList
+  7: optional string validWriteIdList,
+  8: optional bool skipColumnSchemaForPartition,
+  9: optional list<FieldSchema> partitionColSchema
 }
 
 // Return type for drop_partitions_req
@@ -938,7 +961,8 @@ struct DropPartitionsRequest {
   6: optional bool ignoreProtection,
   7: optional EnvironmentContext environmentContext,
   8: optional bool needResult=true,
-  9: optional string catName
+  9: optional string catName,
+  10: optional bool skipColumnSchemaForPartition
 }
 
 struct PartitionValuesRequest {
@@ -969,10 +993,13 @@ struct GetPartitionsByNamesRequest {
   4: optional bool get_col_stats,
   5: optional list<string> processorCapabilities,
   6: optional string processorIdentifier,
-  7: optional string engine,
+  7: optional string engine = "hive",
   8: optional string validWriteIdList,
   9: optional bool getFileMetadata,
-  10: optional i64 id=-1  // table id
+  10: optional i64 id=-1,  // table id
+  11: optional bool skipColumnSchemaForPartition,
+  12: optional string includeParamKeyPattern,
+  13: optional string excludeParamKeyPattern
 }
 
 struct GetPartitionsByNamesResult {
@@ -1460,6 +1487,9 @@ struct NotificationEventRequest {
     1: required i64 lastEvent,
     2: optional i32 maxEvents,
     3: optional list<string> eventTypeSkipList,
+    4: optional string catName,
+    5: optional string dbName,
+    6: optional list<string> tableNames
 }
 
 struct NotificationEvent {
@@ -1486,7 +1516,8 @@ struct NotificationEventsCountRequest {
     2: required string dbName,
     3: optional string catName,
     4: optional i64 toEventId,
-    5: optional i64 limit
+    5: optional i64 limit,
+    6: optional list<string> tableNames
 }
 
 struct NotificationEventsCountResponse {
@@ -1679,7 +1710,7 @@ struct GetTableRequest {
   7: optional bool getColumnStats,
   8: optional list<string> processorCapabilities,
   9: optional string processorIdentifier,
-  10: optional string engine,
+  10: optional string engine = "hive",
   11: optional i64 id=-1 // table id
 }
 
@@ -2168,7 +2199,9 @@ struct AlterPartitionsRequest {
   4: required list<Partition> partitions,
   5: optional EnvironmentContext environmentContext,
   6: optional i64 writeId=-1,
-  7: optional string validWriteIdList
+  7: optional string validWriteIdList,
+  8: optional bool skipColumnSchemaForPartition,
+  9: optional list<FieldSchema> partitionColSchema
 }
 
 struct AlterPartitionsResponse {
@@ -2280,11 +2313,25 @@ struct PartitionsRequest { // Not using Get prefix as that name is already used 
    3: required string tblName,
    4: optional i16 maxParts=-1,
    5: optional string validWriteIdList,
-   6: optional i64 id=-1 // table id
+   6: optional i64 id=-1, // table id
+   7: optional bool skipColumnSchemaForPartition,
+   8: optional string includeParamKeyPattern,
+   9: optional string excludeParamKeyPattern
 }
 
 struct PartitionsResponse { // Not using Get prefix as that name is already used for a different method
    1: required list<Partition> partitions
+}
+
+struct GetPartitionsByFilterRequest {
+   1: optional string catName,
+   2: string dbName,
+   3: string tblName,
+   4: string filter,
+   5: optional i16 maxParts=-1,
+   6: optional bool skipColumnSchemaForPartition,
+   7: optional string includeParamKeyPattern,
+   8: optional string excludeParamKeyPattern
 }
 
 struct GetPartitionNamesPsRequest {
@@ -2311,6 +2358,10 @@ struct GetPartitionsPsWithAuthRequest {
    7: optional list<string> groupNames,
    8: optional string validWriteIdList,
    9: optional i64 id=-1 // table id
+   10: optional bool skipColumnSchemaForPartition,
+   11: optional string includeParamKeyPattern,
+   12: optional string excludeParamKeyPattern,
+   13: optional list<string> partNames;
 }
 
 struct GetPartitionsPsWithAuthResponse {
@@ -2747,6 +2798,9 @@ PartitionsResponse get_partitions_req(1:PartitionsRequest req)
     3:string filter, 4:i16 max_parts=-1)
                        throws(1:MetaException o1, 2:NoSuchObjectException o2)
 
+  list<Partition> get_partitions_by_filter_req(1:GetPartitionsByFilterRequest req)
+    throws(1:MetaException o1, 2:NoSuchObjectException o2)
+
   // List partitions as PartitionSpec instances.
   list<PartitionSpec> get_part_specs_by_filter(1:string db_name 2:string tbl_name
     3:string filter, 4:i32 max_parts=-1)
@@ -2773,6 +2827,11 @@ PartitionsResponse get_partitions_req(1:PartitionsRequest req)
       throws(1:MetaException o1, 2:NoSuchObjectException o2, 3:InvalidObjectException o3)
   GetPartitionsByNamesResult get_partitions_by_names_req(1:GetPartitionsByNamesRequest req)
       throws(1:MetaException o1, 2:NoSuchObjectException o2, 3:InvalidObjectException o3)
+
+    // retrieve properties
+    PropertyGetResponse get_properties(1:PropertyGetRequest req) throws(1:MetaException e1, 2:NoSuchObjectException e2);
+    // set properties
+    bool set_properties(1:PropertySetRequest req) throws(1:MetaException e1, 2:NoSuchObjectException e2);
 
   // changes the partition to the new partition object. partition is identified from the part values
   // in the new_part

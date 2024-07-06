@@ -94,17 +94,22 @@ public class MetastoreConf {
   static final String METASTORE_DELEGATION_MANAGER_CLASS =
       "org.apache.hadoop.hive.metastore.security.MetastoreDelegationTokenManager";
   @VisibleForTesting
-  static final String ACID_HOUSE_KEEPER_SERVICE_CLASS =
-      "org.apache.hadoop.hive.metastore.txn.AcidHouseKeeperService";
+  static final String ACID_HOUSEKEEPER_SERVICE_CLASS =
+      "org.apache.hadoop.hive.metastore.txn.service.AcidHouseKeeperService";
+  @VisibleForTesting
+  static final String COMPACTION_HOUSEKEEPER_SERVICE_CLASS =
+      "org.apache.hadoop.hive.metastore.txn.service.CompactionHouseKeeperService";
   @VisibleForTesting
   static final String ACID_TXN_CLEANER_SERVICE_CLASS =
-      "org.apache.hadoop.hive.metastore.txn.AcidTxnCleanerService";
+      "org.apache.hadoop.hive.metastore.txn.service.AcidTxnCleanerService";
   @VisibleForTesting
   static final String ACID_OPEN_TXNS_COUNTER_SERVICE_CLASS =
-      "org.apache.hadoop.hive.metastore.txn.AcidOpenTxnsCounterService";
+      "org.apache.hadoop.hive.metastore.txn.service.AcidOpenTxnsCounterService";
 
   public static final String METASTORE_AUTHENTICATION_LDAP_USERMEMBERSHIPKEY_NAME =
           "metastore.authentication.ldap.userMembershipKey";
+  public static final String METASTORE_RETRYING_HANDLER_CLASS =
+          "org.apache.hadoop.hive.metastore.RetryingHMSHandler";
 
   private static final Map<String, ConfVars> metaConfs = new HashMap<>();
   private static volatile URL hiveSiteURL = null;
@@ -238,7 +243,9 @@ public class MetastoreConf {
       ConfVars.DISALLOW_INCOMPATIBLE_COL_TYPE_CHANGES,
       ConfVars.FILE_METADATA_THREADS,
       ConfVars.METASTORE_CLIENT_FILTER_ENABLED,
-      ConfVars.METASTORE_SERVER_FILTER_ENABLED
+      ConfVars.METASTORE_SERVER_FILTER_ENABLED,
+      ConfVars.METASTORE_PARTITIONS_PARAMETERS_INCLUDE_PATTERN,
+      ConfVars.METASTORE_PARTITIONS_PARAMETERS_EXCLUDE_PATTERN
   };
 
   /**
@@ -249,6 +256,7 @@ public class MetastoreConf {
       ConfVars.TRY_DIRECT_SQL_DDL,
       ConfVars.CLIENT_SOCKET_TIMEOUT,
       ConfVars.PARTITION_NAME_WHITELIST_PATTERN,
+      ConfVars.PARTITION_ORDER_EXPR,
       ConfVars.CAPABILITY_CHECK,
       ConfVars.DISALLOW_INCOMPATIBLE_COL_TYPE_CHANGES,
       ConfVars.EXPRESSION_PROXY_CLASS
@@ -288,6 +296,9 @@ public class MetastoreConf {
     ACID_HOUSEKEEPER_SERVICE_INTERVAL("metastore.acid.housekeeper.interval",
         "hive.metastore.acid.housekeeper.interval", 60, TimeUnit.SECONDS,
         "Time interval describing how often the acid housekeeper runs."),
+    COMPACTION_HOUSEKEEPER_SERVICE_INTERVAL("metastore.compaction.housekeeper.interval",
+        "hive.metastore.compaction.housekeeper.interval", 300, TimeUnit.SECONDS,
+        "Time interval describing how often the acid compaction housekeeper runs."),
     ACID_TXN_CLEANER_INTERVAL("metastore.acid.txn.cleaner.interval",
         "hive.metastore.acid.txn.cleaner.interval", 10, TimeUnit.SECONDS,
         "Time interval describing how often aborted and committed txns are cleaned."),
@@ -348,9 +359,10 @@ public class MetastoreConf {
             + "To enable auto create also set hive.metastore.schema.verification=false. Auto creation is not "
             + "recommended for production use cases, run schematool command instead." ),
     BATCH_RETRIEVE_MAX("metastore.batch.retrieve.max", "hive.metastore.batch.retrieve.max", 300,
+            new RangeValidator(1, null),
         "Maximum number of objects (tables/partitions) can be retrieved from metastore in one batch. \n" +
             "The higher the number, the less the number of round trips is needed to the Hive metastore server, \n" +
-            "but it may also cause higher memory requirement at the client side."),
+            "but it may also cause higher memory requirement at the client side. Batch value should be greater than 0"),
     BATCH_RETRIEVE_OBJECTS_MAX("metastore.batch.retrieve.table.partition.max",
         "hive.metastore.batch.retrieve.table.partition.max", 1000,
         "Maximum number of objects that metastore internally retrieves in one batch."),
@@ -554,6 +566,13 @@ public class MetastoreConf {
         360, TimeUnit.MINUTES,
         "Logging frequency of ACID related metrics. Set this value to 0 to completely turn off logging. " +
             "Default time unit: minutes"),
+    COMPACTOR_FETCH_SIZE(
+            "metastore.compactor.fetch.size",
+            "hive.compactor.fetch.size",
+            1000,
+            new RangeValidator(100, 5000),
+            "Limits the number of items fetched during cleaning, abort and finding potential compactions. " +
+                    "Allowed values between 100 and 5000"),
     METASTORE_HOUSEKEEPING_LEADER_HOSTNAME("metastore.housekeeping.leader.hostname",
             "hive.metastore.housekeeping.leader.hostname", "",
 "If there are multiple Thrift metastore services running, the hostname of Thrift metastore " +
@@ -566,11 +585,23 @@ public class MetastoreConf {
     METASTORE_HOUSEKEEPING_LEADER_ELECTION("metastore.housekeeping.leader.election",
         "metastore.housekeeping.leader.election",
         "host", new StringSetValidator("host", "lock"),
-        "If sets to host, HMS will choose the leader by the configured metastore.housekeeping.leader.hostname.\n" +
-        "When configured to lock, HMS will use hive locks to elect the leader."),
+        "Set to host, HMS will choose the leader by the configured metastore.housekeeping.leader.hostname.\n" +
+        "Set to lock, HMS will use the Hive lock to elect the leader."),
     METASTORE_HOUSEKEEPING_LEADER_AUDITTABLE("metastore.housekeeping.leader.auditTable",
         "metastore.housekeeping.leader.auditTable", "",
-        "Audit the Metastore leader changes to the target table when configured."),
+        "Audit the leader election event to a plain json table when configured."),
+    METASTORE_HOUSEKEEPING_LEADER_NEW_AUDIT_FILE("metastore.housekeeping.leader.newAuditFile",
+        "metastore.housekeeping.leader.newAuditFile", false,
+        "Whether to create a new audit file in response to the new election event " +
+        "when the metastore.housekeeping.leader.auditTable is not empty.\n" +
+        "True for creating a new file, false otherwise."),
+    METASTORE_HOUSEKEEPING_LEADER_AUDIT_FILE_LIMIT("metastore.housekeeping.leader.auditFiles.limit",
+        "metastore.housekeeping.leader.auditFiles.limit", 10,
+        "Limit the number of small audit files when metastore.housekeeping.leader.newAuditFile is true.\n" +
+        "If the number of audit files exceeds the limit, then the oldest will be deleted."),
+    METASTORE_HOUSEKEEPING_LEADER_LOCK_NAMESPACE("metastore.housekeeping.leader.lock.namespace",
+        "metastore.housekeeping.leader.lock.namespace", "",
+        "The database where the Hive lock sits when metastore.housekeeping.leader.election is set to lock."),
     METASTORE_HOUSEKEEPING_THREADS_ON("metastore.housekeeping.threads.on",
         "hive.metastore.housekeeping.threads.on", false,
         "Whether to run the tasks under metastore.task.threads.remote on this metastore instance or not.\n" +
@@ -651,7 +682,7 @@ public class MetastoreConf {
     COMPACTOR_CLEANER_TABLECACHE_ON("metastore.compactor.cleaner.tablecache.on",
             "hive.compactor.cleaner.tablecache.on", true,
             "Enable table caching in the cleaner. Currently the cache is cleaned after each cycle."),
-    COMPACTOR_CLEAN_ABORTS_USING_CLEANER("metastore.compactor.clean.aborts.using.cleaner", "hive.compactor.clean.aborts.using.cleaner", false,
+    COMPACTOR_CLEAN_ABORTS_USING_CLEANER("metastore.compactor.clean.aborts.using.cleaner", "hive.compactor.clean.aborts.using.cleaner", true,
             "Whether to use cleaner for cleaning aborted directories or not.\n" +
             "Set to true when cleaner is expected to clean delta/delete-delta directories from aborted transactions.\n" +
             "Otherwise the cleanup of such directories will take place within the compaction cycle."),
@@ -874,6 +905,9 @@ public class MetastoreConf {
             "testing only."),
     HMS_HANDLER_INTERVAL("metastore.hmshandler.retry.interval", "hive.hmshandler.retry.interval",
         2000, TimeUnit.MILLISECONDS, "The time between HMSHandler retry attempts on failure."),
+    HMS_HANDLER_PROXY_CLASS("metastore.hmshandler.proxy", "hive.metastore.hmshandler.proxy",
+        METASTORE_RETRYING_HANDLER_CLASS,
+        "The proxy class name of HMSHandler, default is RetryingHMSHandler."),
     IDENTIFIER_FACTORY("datanucleus.identifierFactory",
         "datanucleus.identifierFactory", "datanucleus1",
         "Name of the identifier factory to use when generating table/column names etc. \n" +
@@ -1015,9 +1049,10 @@ public class MetastoreConf {
         "This limits the number of partitions (whole partition objects) that can be requested " +
         "from the metastore for a give table. MetaStore API methods using this are: \n" +
                 "get_partitions, \n" +
+                "get_partitions_by_names, \n" +
                 "get_partitions_with_auth, \n" +
                 "get_partitions_by_filter, \n" +
-                "get_partitions_spec_by_filter, \n" +
+                "get_partitions_spec_by_expr, \n" +
                 "get_partitions_by_expr,\n" +
                 "get_partitions_ps,\n" +
                 "get_partitions_ps_with_auth.\n" +
@@ -1099,6 +1134,22 @@ public class MetastoreConf {
             "metadata being exported to the current user's home directory on HDFS."),
     METASTORE_MAX_EVENT_RESPONSE("metastore.max.event.response", "hive.metastore.max.event.response", 1000000,
         "The parameter will decide the maximum number of events that HMS will respond."),
+    METASTORE_CLIENT_FIELD_SCHEMA_FOR_PARTITIONS("metastore.client.skip.columns.for.partitions",
+            "hive.metastore.client.skip.columns.for.partitions", false,
+            "Config to disable field schema for partitions. Currently all the partitions in a \n"
+                    + "table carries the field schema that is same as that of table schema. For a table with \n"
+                    + "wider partitions fetching duplicated field schema in every partition increases memory footprint\n"
+                    + "and thrift communication timeout errors. Set this config to 'true' to ignore column schema in partitions."),
+    METASTORE_PARTITIONS_PARAMETERS_EXCLUDE_PATTERN("metastore.partitions.parameters.exclude.pattern",
+        "hive.metastore.partitions.parameters.exclude.pattern", "",
+        "SQL pattern used to exclude the matched parameters for get-partitions APIs.\n"
+            + "Any key-value pair from parameters whose key matches with the pattern will be excluded from the partitions.\n"
+            + "This property doesn't work for the temporary table."),
+    METASTORE_PARTITIONS_PARAMETERS_INCLUDE_PATTERN("metastore.partitions.parameters.include.pattern",
+        "hive.metastore.partitions.parameters.include.pattern", "",
+        "SQL pattern used to select the matched parameters for get-partitions APIs.\n"
+            + "Any key-value pair from parameters whose key matches with the pattern will be included in the partitions.\n"
+            + "This property doesn't work for the temporary table."),
     METASTORE_CLIENT_FILTER_ENABLED("metastore.client.filter.enabled", "hive.metastore.client.filter.enabled", true,
         "Enable filtering the metadata read results at HMS client. Default is true."),
     METASTORE_SERVER_FILTER_ENABLED("metastore.server.filter.enabled", "hive.metastore.server.filter.enabled", false,
@@ -1159,6 +1210,14 @@ public class MetastoreConf {
       "If 'partition.retention.period' table property is set, this flag determines whether MSCK REPAIR\n" +
       "command should handle partition retention. If enabled, and if a specific partition's age exceeded\n" +
       "retention period the partition will be dropped along with data"),
+
+    GETPARTITIONS_BATCH_MAX_RETRIES("metastore.getpartitions.batch.max.retries",
+      "hive.getpartitions.batch.max.retries", 5,
+      "Maximum number of retries for the Hive.GetAllPartitionsOf() when getting partitions in batches.\n "
+      + "If the value is greater than zero it will retry getting partitions until the maximum\n"
+      + "number of attempts is reached or batch size is reduced to 0, whichever is earlier.\n"
+      + "In each retry attempt it will reduce the batch size by a factor of 2 until it reaches zero.\n"
+      + "If the value is set to zero it will retry until the batch size becomes zero as described above."),
 
 
     // Partition management task params
@@ -1228,6 +1287,12 @@ public class MetastoreConf {
         "hive.notification.sequence.lock.retry.sleep.interval", 10, TimeUnit.SECONDS,
         "Sleep interval between retries to acquire a notification lock as described part of property "
             + NOTIFICATION_SEQUENCE_LOCK_MAX_RETRIES.name()),
+    NOTIFICATION_ALTER_PARTITIONS_V2_ENABLED("metastore.alterPartitions.notification.v2.enabled",
+        "hive.metastore.alterPartitions.notification.v2.enabled", true,
+        "Should send a single notification event on alter partitions. " +
+            "This property is for ensuring backward compatibility when it sets to false, " +
+            "HMS will send an old ALTER_PARTITION event per partition, so downstream consumers can " +
+            "still process the ALTER_PARTITION event without making changes."),
     ORM_RETRIEVE_MAPNULLS_AS_EMPTY_STRINGS("metastore.orm.retrieveMapNullsAsEmptyStrings",
         "hive.metastore.orm.retrieveMapNullsAsEmptyStrings",false,
         "Thrift does not support nulls in maps, so any nulls present in maps retrieved from ORM must " +
@@ -1237,6 +1302,10 @@ public class MetastoreConf {
     PARTITION_NAME_WHITELIST_PATTERN("metastore.partition.name.whitelist.pattern",
         "hive.metastore.partition.name.whitelist.pattern", "",
         "Partition names will be checked against this regex pattern and rejected if not matched."),
+    PARTITION_ORDER_EXPR("metastore.partition.order.expr",
+        "hive.metastore.partition.order.expr", "\"PART_NAME\" asc",
+        "The default partition order if the metastore does not return all partitions. \n" +
+            "It can be sorted based on any column in the PARTITIONS table (e.g., \"PARTITIONS\".\"CREATE_TIME\" desc, \"PARTITIONS\".\"LAST_ACCESS_TIME\" desc etc)"),
     PART_INHERIT_TBL_PROPS("metastore.partition.inherit.table.properties",
         "hive.metastore.partition.inherit.table.properties", "",
         "List of comma separated keys occurring in table properties which will get inherited to newly created partitions. \n" +
@@ -1322,7 +1391,8 @@ public class MetastoreConf {
             "org.apache.hadoop.hive.serde2.columnar.LazyBinaryColumnarSerDe," +
             "org.apache.hadoop.hive.ql.io.parquet.serde.ParquetHiveSerDe," +
             "org.apache.hadoop.hive.serde2.lazybinary.LazyBinarySerDe," +
-            "org.apache.hadoop.hive.serde2.OpenCSVSerde",
+            "org.apache.hadoop.hive.serde2.OpenCSVSerde," +
+            "org.apache.iceberg.mr.hive.HiveIcebergSerDe",
         "SerDes retrieving schema from metastore. This is an internal parameter."),
     SERDES_WITHOUT_FROM_DESERIALIZER("metastore.serdes.without.from.deserializer",
         "hive.metastore.serdes.without.from.deserializer",
@@ -1410,7 +1480,8 @@ public class MetastoreConf {
             "always be started, regardless of whether the metastore is running in embedded mode " +
             "or in server mode.  They must implement " + METASTORE_TASK_THREAD_CLASS),
     TASK_THREADS_REMOTE_ONLY("metastore.task.threads.remote", "metastore.task.threads.remote",
-        ACID_HOUSE_KEEPER_SERVICE_CLASS + "," +
+        ACID_HOUSEKEEPER_SERVICE_CLASS + "," +
+                COMPACTION_HOUSEKEEPER_SERVICE_CLASS + "," +
             ACID_TXN_CLEANER_SERVICE_CLASS + "," +
             ACID_OPEN_TXNS_COUNTER_SERVICE_CLASS + "," +
             MATERIALZIATIONS_REBUILD_LOCK_CLEANER_TASK_CLASS + "," +
@@ -1443,9 +1514,10 @@ public class MetastoreConf {
                 " corresponding service discovery servers e.g. a zookeeper. Otherwise they are " +
                 "used as URIs for remote metastore."),
     THRIFT_METASTORE_CLIENT_MAX_MESSAGE_SIZE("metastore.thrift.client.max.message.size",
-        "hive.thrift.client.max.message.size", "1gb", new SizeValidator(-1L, true, (long) Integer.MAX_VALUE, true),
-        "Thrift client configuration for max message size. 0 or -1 will use the default defined in the Thrift " +
-        "library. The upper limit is 2147483648 bytes (or 2gb)."),
+            "hive.thrift.client.max.message.size", "2147483647b",
+            new SizeValidator(-1L, true, (long) Integer.MAX_VALUE, true),
+            "Thrift client configuration for max message size. 0 or -1 will use the default defined in the Thrift " +
+                    "library. The upper limit is 2147483647 bytes"),
     THRIFT_SERVICE_DISCOVERY_MODE("metastore.service.discovery.mode",
             "hive.metastore.service.discovery.mode",
             "",
@@ -1496,6 +1568,11 @@ public class MetastoreConf {
         "Keystore password when using a client-side certificate with TLS connectivity to ZooKeeper." +
             "Overrides any explicit value set via the zookeeper.ssl.keyStore.password" +
             "system property (note the camelCase)."),
+    THRIFT_ZOOKEEPER_SSL_KEYSTORE_TYPE("metastore.zookeeper.ssl.keystore.type",
+        "hive.zookeeper.ssl.keystore.type", "",
+        "Keystore type when using a client-side certificate with TLS connectivity to ZooKeeper." +
+            "Overrides any explicit value set via the zookeeper.ssl.keyStore.type" +
+            "system property (note the camelCase)."),
     THRIFT_ZOOKEEPER_SSL_TRUSTSTORE_LOCATION("metastore.zookeeper.ssl.truststore.location",
         "hive.zookeeper.ssl.truststore.location", "",
         "Truststore location when using a client-side certificate with TLS connectivity to ZooKeeper. " +
@@ -1505,6 +1582,11 @@ public class MetastoreConf {
         "hive.zookeeper.ssl.truststore.password", "",
         "Truststore password when using a client-side certificate with TLS connectivity to ZooKeeper." +
             "Overrides any explicit value set via the zookeeper.ssl.trustStore.password " +
+            "system property (note the camelCase)."),
+    THRIFT_ZOOKEEPER_SSL_TRUSTSTORE_TYPE("metastore.zookeeper.ssl.truststore.type",
+        "hive.zookeeper.ssl.truststore.type", "",
+        "Truststore type when using a client-side certificate with TLS connectivity to ZooKeeper." +
+            "Overrides any explicit value set via the zookeeper.ssl.trustStore.type" +
             "system property (note the camelCase)."),
     THRIFT_URI_SELECTION("metastore.thrift.uri.selection", "hive.metastore.uri.selection", "RANDOM",
         new StringSetValidator("RANDOM", "SEQUENTIAL"),
@@ -1563,7 +1645,7 @@ public class MetastoreConf {
         "Time before an open transaction operation should persist, otherwise it is considered invalid and rolled back"),
     TXN_USE_MIN_HISTORY_LEVEL("metastore.txn.use.minhistorylevel", "hive.txn.use.minhistorylevel", true,
         "Set this to false, for the TxnHandler and Cleaner to not use MIN_HISTORY_LEVEL table and take advantage of openTxn optimisation.\n"
-            + "If the table is dropped HMS will switch this flag to false."),
+            + "If the table is dropped HMS will switch this flag to false, any other value changes need a restart to take effect."),
     TXN_USE_MIN_HISTORY_WRITE_ID("metastore.txn.use.minhistorywriteid", "hive.txn.use.minhistorywriteid", false,
       "Set this to true, to avoid global minOpenTxn check in Cleaner.\n"
             + "If the table is dropped HMS will switch this flag to false."),
@@ -1716,6 +1798,30 @@ public class MetastoreConf {
           "metastore.use.custom.database.product is set to true."),
     HIVE_BLOBSTORE_SUPPORTED_SCHEMES("hive.blobstore.supported.schemes", "hive.blobstore.supported.schemes", "s3,s3a,s3n",
             "Comma-separated list of supported blobstore schemes."),
+
+    // Property-maps
+    PROPERTIES_CACHE_CAPACITY("hive.metastore.properties.cache.capacity",
+        "hive.metastore.properties.cache.maxsize", 64,
+        "Maximum number of property-maps (collection of properties for one entity) held in cache per store."
+    ),
+    PROPERTIES_CACHE_LOADFACTOR("hive.metastore.properties.cache.loadfactor",
+        "hive.metastore.properties.cache.maxsize", 0.75d,
+        "Property-maps cache map initial fill factor (> 0.0, < 1.0)."
+    ),
+    PROPERTIES_SERVLET_PATH("hive.metastore.properties.servlet.path",
+        "hive.metastore.properties.servlet.path", "hmscli",
+        "Property-maps servlet path component of URL endpoint."
+    ),
+    PROPERTIES_SERVLET_PORT("hive.metastore.properties.servlet.port",
+        "hive.metastore.properties.servlet.port", -1,
+        "Property-maps servlet server port. Negative value disables the servlet," +
+            " 0 will let the system determine the servlet server port," +
+            " positive value will be used as-is."
+    ),
+    PROPERTIES_SERVLET_AUTH("hive.metastore.properties.servlet.auth",
+        "hive.metastore.properties.servlet.auth", "jwt",
+        "Property-maps servlet authentication method (simple or jwt)."
+    ),
 
     // Deprecated Hive values that we are keeping for backwards compatibility.
     @Deprecated
@@ -2533,8 +2639,10 @@ public class MetastoreConf {
         .sslEnabled(MetastoreConf.getBoolVar(conf, ConfVars.THRIFT_ZOOKEEPER_SSL_ENABLE))
         .keyStoreLocation(MetastoreConf.getVar(conf, ConfVars.THRIFT_ZOOKEEPER_SSL_KEYSTORE_LOCATION))
         .keyStorePassword(keyStorePassword)
+        .keyStoreType(MetastoreConf.getVar(conf, ConfVars.THRIFT_ZOOKEEPER_SSL_KEYSTORE_TYPE))
         .trustStoreLocation(MetastoreConf.getVar(conf, ConfVars.THRIFT_ZOOKEEPER_SSL_TRUSTSTORE_LOCATION))
-        .trustStorePassword(trustStorePassword).build();
+        .trustStorePassword(trustStorePassword)
+        .trustStoreType(MetastoreConf.getVar(conf, ConfVars.THRIFT_ZOOKEEPER_SSL_TRUSTSTORE_TYPE)).build();
   }
 
   /**

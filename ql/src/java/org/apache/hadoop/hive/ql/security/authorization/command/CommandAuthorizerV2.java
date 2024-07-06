@@ -200,9 +200,10 @@ final class CommandAuthorizerV2 {
       if (table.getStorageHandler() != null && HiveConf.getBoolVar(SessionState.getSessionConf(),
           HiveConf.ConfVars.HIVE_AUTHORIZATION_TABLES_ON_STORAGEHANDLERS)) {
         //TODO: add hive privilege object for storage based handlers for create and alter table commands.
-        if (hiveOpType == HiveOperationType.CREATETABLE ||
+        if (privObject instanceof WriteEntity &&
+                (hiveOpType == HiveOperationType.CREATETABLE ||
                 hiveOpType == HiveOperationType.ALTERTABLE_PROPERTIES ||
-                hiveOpType == HiveOperationType.CREATETABLE_AS_SELECT) {
+                hiveOpType == HiveOperationType.CREATETABLE_AS_SELECT)) {
           try {
             String storageUri = table.getStorageHandler().getURIForAuth(table.getTTable()).toString();
             hivePrivObjs.add(new HivePrivilegeObject(HivePrivilegeObjectType.STORAGEHANDLER_URI, null, storageUri, null, null,
@@ -232,8 +233,12 @@ final class CommandAuthorizerV2 {
       break;
     case DUMMYPARTITION:
     case PARTITION:
-      // TODO: not currently handled
-      return;
+      Table tbl = privObject.getTable();
+      List<String> col = tableName2Cols == null ? null :
+              tableName2Cols.get(Table.getCompleteName(tbl.getDbName(), tbl.getTableName()));
+      hivePrivObject = new HivePrivilegeObject(privObjType, tbl.getDbName(), tbl.getTableName(),
+              null, col, actionType, null, null, tbl.getOwner(), tbl.getOwnerType());
+      break;
     case SERVICE_NAME:
       hivePrivObject = new HivePrivilegeObject(privObjType, null, privObject.getServiceName(), null,
           null, actionType, null, null, null, null);

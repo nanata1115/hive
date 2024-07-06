@@ -38,6 +38,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.Set;
 import java.util.SortedMap;
 import java.util.SortedSet;
@@ -546,9 +547,19 @@ public class MetaStoreServerUtils {
       }
     }
 
-    if (MetastoreConf.getBoolVar(conf, MetastoreConf.ConfVars.STATS_AUTO_GATHER)) {
+    if (MetastoreConf.getBoolVar(conf, MetastoreConf.ConfVars.STATS_AUTO_GATHER) && 
+            !getBooleanEnvProp(envContext, StatsSetupConst.DO_NOT_UPDATE_STATS)) {
+      LOG.debug("Calling updateTableStatsSlow for table {}.{}.{}", tbl.getCatName(), tbl.getDbName(), tbl.getTableName());
       updateTableStatsSlow(db, tbl, wh, newDir, false, envContext);
     }
+  }
+
+  public static boolean getBooleanEnvProp(EnvironmentContext envContext, String key) {
+    return Optional.ofNullable(envContext)
+            .map(EnvironmentContext::getProperties)
+            .map(props -> props.getOrDefault(key, StatsSetupConst.FALSE))
+            .map(Boolean::parseBoolean)
+            .orElse(false);
   }
 
   /**
@@ -652,7 +663,8 @@ public class MetaStoreServerUtils {
     if (!madeDir) {
       // The partition location already existed and may contain data. Lets try to
       // populate those statistics that don't require a full scan of the data.
-      LOG.info("Updating partition stats fast for: {}", part.getTableName());
+      LOG.info("Updating partition stats fast for: catalog: {} database: {} table: {} partition: {}",
+              part.getCatName(), part.getDbName(), part.getTableName(), part.getCurrent().getValues());
       List<FileStatus> fileStatus = wh.getFileStatusesForLocation(part.getLocation());
       // TODO: this is invalid for ACID tables, and we cannot access AcidUtils here.
       populateQuickStats(fileStatus, params);

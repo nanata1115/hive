@@ -257,6 +257,7 @@ public final class Utilities {
   public static final String MAPNAME = "Map ";
   public static final String REDUCENAME = "Reducer ";
   public static final String ENSURE_OPERATORS_EXECUTED = "ENSURE_OPERATORS_EXECUTED";
+  public static final String SNAPSHOT_REF = "snapshot_ref";
 
   @Deprecated
   protected static final String DEPRECATED_MAPRED_DFSCLIENT_PARALLELISM_MAX = "mapred.dfsclient.parallelism.max";
@@ -763,6 +764,9 @@ public final class Utilities {
     if (tbl.getMetaTable() != null) {
       props.put("metaTable", tbl.getMetaTable());
     }
+    if (tbl.getSnapshotRef() != null) {
+      props.put(SNAPSHOT_REF, tbl.getSnapshotRef());
+    }
     return (new TableDesc(tbl.getInputFormatClass(), tbl
         .getOutputFormatClass(), props));
   }
@@ -1035,7 +1039,8 @@ public final class Utilities {
     return src;
   }
 
-  private static final String tmpPrefix = "_tmp.";
+  private static final String hadoopTmpPrefix = "_tmp.";
+  private static final String tmpPrefix = "-tmp.";
   private static final String taskTmpPrefix = "_task_tmp.";
 
   public static Path toTaskTempPath(Path orig) {
@@ -1066,7 +1071,7 @@ public final class Utilities {
     String name = file.getPath().getName();
     // in addition to detecting hive temporary files, we also check hadoop
     // temporary folders that used to show up in older releases
-    return (name.startsWith("_task") || name.startsWith(tmpPrefix));
+    return (name.startsWith("_task") || name.startsWith(tmpPrefix) || name.startsWith(hadoopTmpPrefix));
   }
 
   /**
@@ -1389,7 +1394,7 @@ public final class Utilities {
   }
 
 
-  private static boolean shouldAvoidRename(FileSinkDesc conf, Configuration hConf) {
+  public static boolean shouldAvoidRename(FileSinkDesc conf, Configuration hConf) {
     // we are avoiding rename/move only if following conditions are met
     //  * execution engine is tez
     //  * if it is select query
@@ -1431,6 +1436,9 @@ public final class Utilities {
     FileSystem fs = specPath.getFileSystem(hconf);
     Path tmpPath = Utilities.toTempPath(specPath);
     Path taskTmpPath = Utilities.toTaskTempPath(specPath);
+    if (!StringUtils.isEmpty(unionSuffix)) {
+      specPath = specPath.getParent();
+    }
     PerfLogger perfLogger = SessionState.getPerfLogger();
     boolean isBlobStorage = BlobStorageUtils.isBlobStorageFileSystem(hconf, fs);
     boolean avoidRename = false;
@@ -2931,12 +2939,12 @@ public final class Utilities {
 
   private static void validateDynPartitionCount(Configuration conf, Collection<Path> partitions) throws HiveException {
     int partsToLoad = partitions.size();
-    int maxPartition = HiveConf.getIntVar(conf, HiveConf.ConfVars.DYNAMICPARTITIONMAXPARTS);
+    int maxPartition = HiveConf.getIntVar(conf, HiveConf.ConfVars.DYNAMIC_PARTITION_MAX_PARTS);
     if (partsToLoad > maxPartition) {
       throw new HiveException("Number of dynamic partitions created is " + partsToLoad
           + ", which is more than "
           + maxPartition
-          +". To solve this try to set " + HiveConf.ConfVars.DYNAMICPARTITIONMAXPARTS.varname
+          +". To solve this try to set " + HiveConf.ConfVars.DYNAMIC_PARTITION_MAX_PARTS.varname
           + " to at least " + partsToLoad + '.');
     }
   }
@@ -3348,8 +3356,8 @@ public final class Utilities {
    */
   public static int estimateNumberOfReducers(HiveConf conf, ContentSummary inputSummary,
                                              MapWork work, boolean finalMapRed) throws IOException {
-    long bytesPerReducer = conf.getLongVar(HiveConf.ConfVars.BYTESPERREDUCER);
-    int maxReducers = conf.getIntVar(HiveConf.ConfVars.MAXREDUCERS);
+    long bytesPerReducer = conf.getLongVar(HiveConf.ConfVars.BYTES_PER_REDUCER);
+    int maxReducers = conf.getIntVar(HiveConf.ConfVars.MAX_REDUCERS);
 
     double samplePercentage = getHighestSamplePercentage(work);
     long totalInputFileSize = getTotalInputFileSize(inputSummary, work, samplePercentage);
@@ -3517,6 +3525,9 @@ public final class Utilities {
     Set<Path> pathsProcessed = new HashSet<Path>();
     List<Path> pathsToAdd = new LinkedList<Path>();
     DriverState driverState = DriverState.getDriverState();
+    if (work.isUseInputPathsDirectly() && work.getInputPaths() != null) {
+      return work.getInputPaths();
+    }
     // AliasToWork contains all the aliases
     Collection<String> aliasToWork = work.getAliasToWork().keySet();
     if (!skipDummy) {
@@ -3798,7 +3809,7 @@ public final class Utilities {
    */
   public static void setInputAttributes(Configuration conf, MapWork mWork) {
     HiveConf.ConfVars var = HiveConf.getVar(conf, HiveConf.ConfVars.HIVE_EXECUTION_ENGINE).equals("tez") ?
-      HiveConf.ConfVars.HIVETEZINPUTFORMAT : HiveConf.ConfVars.HIVEINPUTFORMAT;
+      HiveConf.ConfVars.HIVE_TEZ_INPUT_FORMAT : HiveConf.ConfVars.HIVE_INPUT_FORMAT;
     if (mWork.getInputformat() != null) {
       HiveConf.setVar(conf, var, mWork.getInputformat());
     }
@@ -4188,7 +4199,7 @@ public final class Utilities {
   public static List<String> getStatsTmpDirs(BaseWork work, Configuration conf) {
 
     List<String> statsTmpDirs = new ArrayList<>();
-    if (!StatsSetupConst.StatDB.fs.name().equalsIgnoreCase(HiveConf.getVar(conf, ConfVars.HIVESTATSDBCLASS))) {
+    if (!StatsSetupConst.StatDB.fs.name().equalsIgnoreCase(HiveConf.getVar(conf, ConfVars.HIVE_STATS_DBCLASS))) {
       // no-op for non-fs stats collection
       return statsTmpDirs;
     }
@@ -4548,7 +4559,7 @@ public final class Utilities {
     if (isDelete) {
       deltaDir = AcidUtils.deleteDeltaSubdir(writeId, writeId, stmtId);
     }
-    Path manifestPath = new Path(manifestRoot, "_tmp." + deltaDir);
+    Path manifestPath = new Path(manifestRoot, Utilities.toTempPath(deltaDir));
 
     if (isInsertOverwrite) {
       // When doing a multi-statement insert overwrite query with dynamic partitioning, the
@@ -4950,11 +4961,27 @@ public final class Utilities {
         "HDFS dir: " + rootHDFSDirPath + ", permission: " + currentHDFSDirPermission);
     }
     // If the root HDFS scratch dir already exists, make sure it is writeable.
-    if (!((currentHDFSDirPermission.toShort() & writableHDFSDirPermission
-        .toShort()) == writableHDFSDirPermission.toShort())) {
-      throw new RuntimeException("The dir: " + rootHDFSDirPath
-          + " on HDFS should be writable. Current permissions are: " + currentHDFSDirPermission);
+    if (!isWritable(currentHDFSDirPermission, writableHDFSDirPermission) &&
+        !attemptMakePathWritable(fs, rootHDFSDirPath,
+            FsPermission.createImmutable((short) (currentHDFSDirPermission.toShort() | writableHDFSDirPermission.toShort())))) {
+      throw new RuntimeException(
+          "The dir: " + rootHDFSDirPath + " should be writable. Current permissions are: " + currentHDFSDirPermission);
     }
+  }
+
+  private static boolean attemptMakePathWritable(FileSystem fs, Path path, FsPermission perm) {
+    try {
+      LOG.info("Attempting to set {} permissions on path {}", perm, path);
+      fs.setPermission(path, perm);
+      return isWritable(fs.getFileStatus(path).getPermission(), perm);
+    } catch (IOException e) {
+      return false;
+    }
+  }
+
+  private static boolean isWritable(FsPermission currentHDFSDirPermission, FsPermission writableHDFSDirPermission) {
+    return (currentHDFSDirPermission.toShort() & writableHDFSDirPermission.toShort())
+        == writableHDFSDirPermission.toShort();
   }
 
   // Get the bucketing version stored in the string format
@@ -5034,11 +5061,6 @@ public final class Utilities {
       logger.debug("{} class path = unavailable for {}", prefix,
           loader == null ? "null" : loader.getClass().getSimpleName());
     }
-  }
-
-  public static boolean arePathsEqualOrWithin(Path p1, Path p2) {
-    return ((p1.toString().toLowerCase().indexOf(p2.toString().toLowerCase()) > -1) ||
-        (p2.toString().toLowerCase().indexOf(p1.toString().toLowerCase()) > -1)) ? true : false;
   }
 
   public static String getTableOrMVSuffix(Context context, boolean createTableOrMVUseSuffix) {

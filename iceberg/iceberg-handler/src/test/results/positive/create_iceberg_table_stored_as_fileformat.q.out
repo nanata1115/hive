@@ -1,7 +1,9 @@
 PREHOOK: query: DROP TABLE IF EXISTS ice_orc
 PREHOOK: type: DROPTABLE
+PREHOOK: Output: database:default
 POSTHOOK: query: DROP TABLE IF EXISTS ice_orc
 POSTHOOK: type: DROPTABLE
+POSTHOOK: Output: database:default
 PREHOOK: query: CREATE EXTERNAL TABLE ice_orc (i int, s string, ts timestamp, d date) STORED BY ICEBERG STORED AS ORC
 PREHOOK: type: CREATETABLE
 PREHOOK: Output: database:default
@@ -33,17 +35,18 @@ Table Parameters:
 	EXTERNAL            	TRUE                
 	bucketing_version   	2                   
 	current-schema      	{\"type\":\"struct\",\"schema-id\":0,\"fields\":[{\"id\":1,\"name\":\"i\",\"required\":false,\"type\":\"int\"},{\"id\":2,\"name\":\"s\",\"required\":false,\"type\":\"string\"},{\"id\":3,\"name\":\"ts\",\"required\":false,\"type\":\"timestamp\"},{\"id\":4,\"name\":\"d\",\"required\":false,\"type\":\"date\"}]}
-	engine.hive.enabled 	true                
+	format-version      	2                   
 	iceberg.orc.files.only	true                
 	metadata_location   	hdfs://### HDFS PATH ###
 	numFiles            	0                   
 	numRows             	0                   
+	parquet.compression 	zstd                
 	rawDataSize         	0                   
 	serialization.format	1                   
 	snapshot-count      	0                   
 	storage_handler     	org.apache.iceberg.mr.hive.HiveIcebergStorageHandler
 	table_type          	ICEBERG             
-	totalSize           	#Masked#                   
+	totalSize           	#Masked#
 #### A masked pattern was here ####
 	uuid                	#Masked#
 	write.format.default	orc                 
@@ -57,15 +60,19 @@ Sort Columns:       	[]
 PREHOOK: query: DROP TABLE ice_orc
 PREHOOK: type: DROPTABLE
 PREHOOK: Input: default@ice_orc
+PREHOOK: Output: database:default
 PREHOOK: Output: default@ice_orc
 POSTHOOK: query: DROP TABLE ice_orc
 POSTHOOK: type: DROPTABLE
 POSTHOOK: Input: default@ice_orc
+POSTHOOK: Output: database:default
 POSTHOOK: Output: default@ice_orc
 PREHOOK: query: DROP TABLE IF EXISTS ice_parquet
 PREHOOK: type: DROPTABLE
+PREHOOK: Output: database:default
 POSTHOOK: query: DROP TABLE IF EXISTS ice_parquet
 POSTHOOK: type: DROPTABLE
+POSTHOOK: Output: database:default
 PREHOOK: query: CREATE EXTERNAL TABLE ice_parquet (i int, s string, ts timestamp, d date) STORED BY ICEBERG STORED AS PARQUET
 PREHOOK: type: CREATETABLE
 PREHOOK: Output: database:default
@@ -97,17 +104,18 @@ Table Parameters:
 	EXTERNAL            	TRUE                
 	bucketing_version   	2                   
 	current-schema      	{\"type\":\"struct\",\"schema-id\":0,\"fields\":[{\"id\":1,\"name\":\"i\",\"required\":false,\"type\":\"int\"},{\"id\":2,\"name\":\"s\",\"required\":false,\"type\":\"string\"},{\"id\":3,\"name\":\"ts\",\"required\":false,\"type\":\"timestamp\"},{\"id\":4,\"name\":\"d\",\"required\":false,\"type\":\"date\"}]}
-	engine.hive.enabled 	true                
+	format-version      	2                   
 	iceberg.orc.files.only	false               
 	metadata_location   	hdfs://### HDFS PATH ###
 	numFiles            	0                   
 	numRows             	0                   
+	parquet.compression 	zstd                
 	rawDataSize         	0                   
 	serialization.format	1                   
 	snapshot-count      	0                   
 	storage_handler     	org.apache.iceberg.mr.hive.HiveIcebergStorageHandler
 	table_type          	ICEBERG             
-	totalSize           	#Masked#                   
+	totalSize           	#Masked#
 #### A masked pattern was here ####
 	uuid                	#Masked#
 	write.format.default	parquet             
@@ -121,15 +129,19 @@ Sort Columns:       	[]
 PREHOOK: query: DROP TABLE ice_parquet
 PREHOOK: type: DROPTABLE
 PREHOOK: Input: default@ice_parquet
+PREHOOK: Output: database:default
 PREHOOK: Output: default@ice_parquet
 POSTHOOK: query: DROP TABLE ice_parquet
 POSTHOOK: type: DROPTABLE
 POSTHOOK: Input: default@ice_parquet
+POSTHOOK: Output: database:default
 POSTHOOK: Output: default@ice_parquet
 PREHOOK: query: DROP TABLE IF EXISTS ice_avro
 PREHOOK: type: DROPTABLE
+PREHOOK: Output: database:default
 POSTHOOK: query: DROP TABLE IF EXISTS ice_avro
 POSTHOOK: type: DROPTABLE
+POSTHOOK: Output: database:default
 PREHOOK: query: CREATE EXTERNAL TABLE ice_avro (i int, s string, ts timestamp, d date) STORED BY ICEBERG STORED AS AVRO
 PREHOOK: type: CREATETABLE
 PREHOOK: Output: database:default
@@ -161,17 +173,18 @@ Table Parameters:
 	EXTERNAL            	TRUE                
 	bucketing_version   	2                   
 	current-schema      	{\"type\":\"struct\",\"schema-id\":0,\"fields\":[{\"id\":1,\"name\":\"i\",\"required\":false,\"type\":\"int\"},{\"id\":2,\"name\":\"s\",\"required\":false,\"type\":\"string\"},{\"id\":3,\"name\":\"ts\",\"required\":false,\"type\":\"timestamp\"},{\"id\":4,\"name\":\"d\",\"required\":false,\"type\":\"date\"}]}
-	engine.hive.enabled 	true                
+	format-version      	2                   
 	iceberg.orc.files.only	false               
 	metadata_location   	hdfs://### HDFS PATH ###
 	numFiles            	0                   
 	numRows             	0                   
+	parquet.compression 	zstd                
 	rawDataSize         	0                   
 	serialization.format	1                   
 	snapshot-count      	0                   
 	storage_handler     	org.apache.iceberg.mr.hive.HiveIcebergStorageHandler
 	table_type          	ICEBERG             
-	totalSize           	#Masked#                   
+	totalSize           	#Masked#
 #### A masked pattern was here ####
 	uuid                	#Masked#
 	write.format.default	avro                
@@ -185,15 +198,19 @@ Sort Columns:       	[]
 PREHOOK: query: DROP TABLE ice_avro
 PREHOOK: type: DROPTABLE
 PREHOOK: Input: default@ice_avro
+PREHOOK: Output: database:default
 PREHOOK: Output: default@ice_avro
 POSTHOOK: query: DROP TABLE ice_avro
 POSTHOOK: type: DROPTABLE
 POSTHOOK: Input: default@ice_avro
+POSTHOOK: Output: database:default
 POSTHOOK: Output: default@ice_avro
 PREHOOK: query: DROP TABLE IF EXISTS ice_t
 PREHOOK: type: DROPTABLE
+PREHOOK: Output: database:default
 POSTHOOK: query: DROP TABLE IF EXISTS ice_t
 POSTHOOK: type: DROPTABLE
+POSTHOOK: Output: database:default
 PREHOOK: query: CREATE EXTERNAL TABLE ice_t (i int, s string, ts timestamp, d date) STORED BY 'org.apache.iceberg.mr.hive.HiveIcebergStorageHandler' STORED AS AVRO
 PREHOOK: type: CREATETABLE
 PREHOOK: Output: database:default
@@ -225,17 +242,18 @@ Table Parameters:
 	EXTERNAL            	TRUE                
 	bucketing_version   	2                   
 	current-schema      	{\"type\":\"struct\",\"schema-id\":0,\"fields\":[{\"id\":1,\"name\":\"i\",\"required\":false,\"type\":\"int\"},{\"id\":2,\"name\":\"s\",\"required\":false,\"type\":\"string\"},{\"id\":3,\"name\":\"ts\",\"required\":false,\"type\":\"timestamp\"},{\"id\":4,\"name\":\"d\",\"required\":false,\"type\":\"date\"}]}
-	engine.hive.enabled 	true                
+	format-version      	2                   
 	iceberg.orc.files.only	false               
 	metadata_location   	hdfs://### HDFS PATH ###
 	numFiles            	0                   
 	numRows             	0                   
+	parquet.compression 	zstd                
 	rawDataSize         	0                   
 	serialization.format	1                   
 	snapshot-count      	0                   
 	storage_handler     	org.apache.iceberg.mr.hive.HiveIcebergStorageHandler
 	table_type          	ICEBERG             
-	totalSize           	#Masked#                   
+	totalSize           	#Masked#
 #### A masked pattern was here ####
 	uuid                	#Masked#
 	write.format.default	avro                
@@ -249,10 +267,12 @@ Sort Columns:       	[]
 PREHOOK: query: DROP TABLE ice_t
 PREHOOK: type: DROPTABLE
 PREHOOK: Input: default@ice_t
+PREHOOK: Output: database:default
 PREHOOK: Output: default@ice_t
 POSTHOOK: query: DROP TABLE ice_t
 POSTHOOK: type: DROPTABLE
 POSTHOOK: Input: default@ice_t
+POSTHOOK: Output: database:default
 POSTHOOK: Output: default@ice_t
 PREHOOK: query: CREATE EXTERNAL TABLE ice_t (i int, s string, ts timestamp, d date) STORED BY ICEBERG WITH SERDEPROPERTIES('dummy'='dummy_value') STORED AS ORC
 PREHOOK: type: CREATETABLE
@@ -286,17 +306,18 @@ Table Parameters:
 	bucketing_version   	2                   
 	current-schema      	{\"type\":\"struct\",\"schema-id\":0,\"fields\":[{\"id\":1,\"name\":\"i\",\"required\":false,\"type\":\"int\"},{\"id\":2,\"name\":\"s\",\"required\":false,\"type\":\"string\"},{\"id\":3,\"name\":\"ts\",\"required\":false,\"type\":\"timestamp\"},{\"id\":4,\"name\":\"d\",\"required\":false,\"type\":\"date\"}]}
 	dummy               	dummy_value         
-	engine.hive.enabled 	true                
+	format-version      	2                   
 	iceberg.orc.files.only	true                
 	metadata_location   	hdfs://### HDFS PATH ###
 	numFiles            	0                   
 	numRows             	0                   
+	parquet.compression 	zstd                
 	rawDataSize         	0                   
 	serialization.format	1                   
 	snapshot-count      	0                   
 	storage_handler     	org.apache.iceberg.mr.hive.HiveIcebergStorageHandler
 	table_type          	ICEBERG             
-	totalSize           	#Masked#                   
+	totalSize           	#Masked#
 #### A masked pattern was here ####
 	uuid                	#Masked#
 	write.format.default	orc                 
@@ -310,8 +331,10 @@ Sort Columns:       	[]
 PREHOOK: query: DROP TABLE ice_t
 PREHOOK: type: DROPTABLE
 PREHOOK: Input: default@ice_t
+PREHOOK: Output: database:default
 PREHOOK: Output: default@ice_t
 POSTHOOK: query: DROP TABLE ice_t
 POSTHOOK: type: DROPTABLE
 POSTHOOK: Input: default@ice_t
+POSTHOOK: Output: database:default
 POSTHOOK: Output: default@ice_t

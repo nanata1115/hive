@@ -19,6 +19,7 @@ package org.apache.hadoop.hive.ql.txn.compactor.handler;
 
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.hive.common.ValidCleanerWriteIdList;
 import org.apache.hadoop.hive.common.ValidReadTxnList;
 import org.apache.hadoop.hive.common.ValidReaderWriteIdList;
 import org.apache.hadoop.hive.common.ValidTxnList;
@@ -30,7 +31,7 @@ import org.apache.hadoop.hive.metastore.api.NoSuchTxnException;
 import org.apache.hadoop.hive.metastore.api.Partition;
 import org.apache.hadoop.hive.metastore.api.Table;
 import org.apache.hadoop.hive.metastore.metrics.AcidMetricService;
-import org.apache.hadoop.hive.metastore.txn.CompactionInfo;
+import org.apache.hadoop.hive.metastore.txn.entities.CompactionInfo;
 import org.apache.hadoop.hive.metastore.txn.TxnCommonUtils;
 import org.apache.hadoop.hive.metastore.txn.TxnStore;
 import org.apache.hadoop.hive.ql.io.AcidDirectory;
@@ -45,12 +46,16 @@ import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.util.Arrays;
-import java.util.BitSet;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.TimeUnit;
 
 import static org.apache.commons.collections.ListUtils.subtract;
+import static org.apache.hadoop.hive.metastore.conf.MetastoreConf.ConfVars.HIVE_COMPACTOR_CLEANER_MAX_RETRY_ATTEMPTS;
+import static org.apache.hadoop.hive.metastore.conf.MetastoreConf.ConfVars.HIVE_COMPACTOR_CLEANER_RETRY_RETENTION_TIME;
+import static org.apache.hadoop.hive.metastore.conf.MetastoreConf.getIntVar;
+import static org.apache.hadoop.hive.metastore.conf.MetastoreConf.getTimeVar;
 
 /**
  * An abstract class which defines the list of utility methods for performing cleanup activities.
@@ -63,6 +68,7 @@ public abstract class TaskHandler {
   protected final boolean metricsEnabled;
   protected final MetadataCache metadataCache;
   protected final FSRemover fsRemover;
+  protected final long defaultRetention;
 
   TaskHandler(HiveConf conf, TxnStore txnHandler, MetadataCache metadataCache,
                          boolean metricsEnabled, FSRemover fsRemover) {
@@ -71,6 +77,7 @@ public abstract class TaskHandler {
     this.metadataCache = metadataCache;
     this.metricsEnabled = metricsEnabled;
     this.fsRemover = fsRemover;
+    this.defaultRetention = getTimeVar(conf, HIVE_COMPACTOR_CLEANER_RETRY_RETENTION_TIME, TimeUnit.MILLISECONDS);
   }
 
   public abstract List<Runnable> getTasks() throws MetaException;
@@ -80,27 +87,7 @@ public abstract class TaskHandler {
   }
 
   protected Partition resolvePartition(String dbName, String tableName, String partName) throws MetaException {
-    if (partName != null) {
-      List<Partition> parts;
-      try {
-        parts = CompactorUtil.getPartitionsByNames(conf, dbName, tableName, partName);
-        if (parts == null || parts.isEmpty()) {
-          // The partition got dropped before we went looking for it.
-          return null;
-        }
-      } catch (Exception e) {
-        LOG.error("Unable to find partition: {}.{}.{}", dbName, tableName, partName, e);
-        throw e;
-      }
-      if (parts.size() != 1) {
-        LOG.error("{}.{}.{} does not refer to a single partition. {}", dbName, tableName, partName,
-                Arrays.toString(parts.toArray()));
-        throw new MetaException(String.join("Too many partitions for : ", dbName, tableName, partName));
-      }
-      return parts.get(0);
-    } else {
-      return null;
-    }
+    return CompactorUtil.resolvePartition(conf, null, dbName, tableName, partName, CompactorUtil.METADATA_FETCH_MODE.LOCAL);
   }
 
   protected ValidReaderWriteIdList getValidCleanerWriteIdList(CompactionInfo info, ValidTxnList validTxnList)
@@ -114,7 +101,8 @@ public abstract class TaskHandler {
     // been some delta/base dirs
     assert rsp != null && rsp.getTblValidWriteIdsSize() == 1;
 
-    return TxnCommonUtils.createValidReaderWriteIdList(rsp.getTblValidWriteIds().get(0));
+    return new ValidCleanerWriteIdList(
+        TxnCommonUtils.createValidReaderWriteIdList(rsp.getTblValidWriteIds().get(0)));
   }
 
   protected boolean cleanAndVerifyObsoleteDirectories(CompactionInfo info, String location,
@@ -146,8 +134,7 @@ public abstract class TaskHandler {
     // Make sure there are no leftovers below the compacted watermark
     boolean success = false;
     conf.set(ValidTxnList.VALID_TXNS_KEY, new ValidReadTxnList().toString());
-    dir = AcidUtils.getAcidState(fs, path, conf, new ValidReaderWriteIdList(
-                    info.getFullTableName(), new long[0], new BitSet(), info.highestWriteId, Long.MAX_VALUE),
+    dir = AcidUtils.getAcidState(fs, path, conf, new ValidCleanerWriteIdList(info.getFullTableName(), info.highestWriteId),
             Ref.from(false), false, dirSnapshots);
 
     List<Path> remained = subtract(CompactorUtil.getObsoleteDirs(dir, isDynPartAbort), deleted);
@@ -160,5 +147,27 @@ public abstract class TaskHandler {
     }
 
     return success;
+  }
+
+  protected void handleCleanerAttemptFailure(CompactionInfo info, String errorMessage) throws MetaException {
+    int cleanAttempts = 0;
+    info.errorMessage = errorMessage;
+    if (info.isAbortedTxnCleanup()) {
+      info.retryRetention = info.retryRetention > 0 ? info.retryRetention * 2 : defaultRetention;
+      info.errorMessage = errorMessage;
+      txnHandler.setCleanerRetryRetentionTimeOnError(info);
+    } else {
+      if (info.retryRetention > 0) {
+        cleanAttempts = (int) (Math.log(info.retryRetention / defaultRetention) / Math.log(2)) + 1;
+      }
+      if (cleanAttempts >= getIntVar(conf, HIVE_COMPACTOR_CLEANER_MAX_RETRY_ATTEMPTS)) {
+        //Mark it as failed if the max attempt threshold is reached.
+        txnHandler.markFailed(info);
+      } else {
+        //Calculate retry retention time and update record.
+        info.retryRetention = (long) Math.pow(2, cleanAttempts) * defaultRetention;
+        txnHandler.setCleanerRetryRetentionTimeOnError(info);
+      }
+    }
   }
 }

@@ -29,6 +29,7 @@ import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.hive.common.TableName;
 import org.apache.hadoop.hive.common.ValidTxnList;
 import org.apache.hadoop.hive.common.ValidWriteIdList;
 import org.apache.hadoop.hive.common.classification.RetrySemantics;
@@ -555,7 +556,10 @@ public interface IMetaStoreClient extends AutoCloseable {
    * @throws MetaException Failure in the RDBMS or storage
    * @throws TException Thrift transport exception
    */
+  @Deprecated
   void truncateTable(String dbName, String tableName, List<String> partNames) throws MetaException, TException;
+
+  void truncateTable(TableName table, List<String> partNames) throws TException;
 
   void truncateTable(String dbName, String tableName, List<String> partNames,
       String validWriteIds, long writeId) throws TException;
@@ -574,6 +578,7 @@ public interface IMetaStoreClient extends AutoCloseable {
    * @throws MetaException Failure in the RDBMS or storage
    * @throws TException Thrift transport exception
    */
+  @Deprecated
   void truncateTable(String catName, String dbName, String tableName, List<String> partNames)
       throws MetaException, TException;
 
@@ -4393,4 +4398,27 @@ public interface IMetaStoreClient extends AutoCloseable {
 
   AbortCompactResponse abortCompactions(AbortCompactionRequest request) throws TException;
 
+  /**
+   * Sets properties.
+   * @param nameSpace the property store namespace
+   * @param properties a map keyed by property path mapped to property values
+   * @return true if successful, false otherwise
+   * @throws TException
+   */
+  default boolean setProperties(String nameSpace, Map<String, String> properties) throws TException {
+    throw new UnsupportedOperationException();
+  }
+
+  /**
+   * Gets properties.
+   * @param nameSpace the property store namespace.
+   * @param mapPrefix the map prefix (ala starts-with) to select maps
+   * @param mapPredicate predicate expression on properties to further reduce the selected maps
+   * @param selection the list of properties to return, null for all
+   * @return a map keyed by property map path to maps keyed by property name mapped to property values
+   * @throws TException
+   */
+  default Map<String, Map<String, String>> getProperties(String nameSpace, String mapPrefix, String mapPredicate, String... selection) throws TException {
+    throw new UnsupportedOperationException();
+  };
 }
